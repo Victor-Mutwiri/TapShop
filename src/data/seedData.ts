@@ -20,6 +20,7 @@ export const INITIAL_STORE: Store = {
     mpesaType: 'till',
     number: '849201',
     accountName: 'SOLARIUM VAULT',
+    paybillAccount: 'SOLARIUM',
     instructions: 'Go to M-Pesa > Lipa na M-Pesa > Buy Goods and Services > Enter Till: 849201 > Enter Amount > Enter PIN > Copy or screenshot the M-Pesa message and attach below.',
   },
   pickupStations: [
@@ -141,7 +142,6 @@ export const INITIAL_ORDERS: Order[] = [
     subtotal: 2800,
     fulfillmentFee: 0,
     totalAmount: 2800,
-    collectionPin: '8192', // Security PIN to verify customer at pickup
     paymentProof: {
       method: 'mpesa',
       transactionCode: 'RK94JN182P',
@@ -235,7 +235,7 @@ export const INITIAL_NOTIFICATIONS: StoreNotification[] = [
     id: 'notif_1',
     orderId: 'TAP-9402',
     title: 'New Shop Pickup Order',
-    message: 'Brenda Wanjiku placed order TAP-9402 for Veteran House CBD Hub. Collection PIN: 8192. M-Pesa verification pending.',
+    message: 'Brenda Wanjiku placed order TAP-9402 for Veteran House CBD Hub. M-Pesa verification pending.',
     timestamp: '24 mins ago',
     read: false,
     type: 'new_order',

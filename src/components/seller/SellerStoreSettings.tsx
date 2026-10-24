@@ -13,7 +13,12 @@ import {
   Trash2,
   Save,
   Check,
+  Smartphone,
+  Building,
+  Tag,
+  Briefcase,
 } from 'lucide-react';
+import { MpesaPaymentType } from '../../types';
 
 export const SellerStoreSettings: React.FC = () => {
   const { store, updateStore } = useStore();
@@ -28,10 +33,11 @@ export const SellerStoreSettings: React.FC = () => {
   const [operatingHours, setOperatingHours] = useState(store.operatingHours || '');
   const [instagram, setInstagram] = useState(store.instagram);
 
-  // M-Pesa
-  const [mpesaType, setMpesaType] = useState(store.paymentMethods.mpesaType);
+  // Kenyan M-Pesa Options (Till, Paybill, Send Money, Pochi La Biashara)
+  const [mpesaType, setMpesaType] = useState<MpesaPaymentType>(store.paymentMethods.mpesaType || 'till');
   const [mpesaNumber, setMpesaNumber] = useState(store.paymentMethods.number);
   const [accountName, setAccountName] = useState(store.paymentMethods.accountName);
+  const [paybillAccount, setPaybillAccount] = useState(store.paymentMethods.paybillAccount || '');
   const [instructions, setInstructions] = useState(store.paymentMethods.instructions);
 
   // Delivery Zones
@@ -96,6 +102,7 @@ export const SellerStoreSettings: React.FC = () => {
         mpesaType,
         number: mpesaNumber.trim(),
         accountName: accountName.trim(),
+        paybillAccount: mpesaType === 'paybill' ? paybillAccount.trim() : undefined,
         instructions: instructions.trim(),
       },
       pickupStations,
@@ -402,32 +409,307 @@ export const SellerStoreSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* M-PESA PAYMENT DETAILS */}
+        {/* KENYAN M-PESA PAYMENT SETUP (Till, Paybill, Send Money, Pochi La Biashara) */}
         <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-emerald-600" />
-            <span>Lipa na M-Pesa Setup</span>
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <span>Kenyan Payment Method Options</span>
+            </h3>
+            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              Pick Your Preferred Method
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <p className="text-slate-500 text-[11px]">
+            Choose how your customers will pay when placing orders via your social media link in bio.
+          </p>
+
+          {/* 4 Method Options Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* 1. Till Number */}
+            <button
+              type="button"
+              onClick={() => {
+                setMpesaType('till');
+                if (!instructions || instructions.includes('Pochi') || instructions.includes('Paybill') || instructions.includes('Send Money')) {
+                  setInstructions('Go to M-Pesa > Lipa na M-Pesa > Buy Goods and Services > Enter Till: ' + (mpesaNumber || '[Till]') + ' > Enter Amount > Enter PIN > Attach M-Pesa message below.');
+                }
+              }}
+              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                mpesaType === 'till'
+                  ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  mpesaType === 'till' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Tag className="w-4 h-4" />
+                </div>
+                {mpesaType === 'till' && <Check className="w-4 h-4 text-emerald-600 font-bold" />}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs">Buy Goods</div>
+                <div className="text-[10px] text-slate-500">Till Number</div>
+              </div>
+            </button>
+
+            {/* 2. Paybill */}
+            <button
+              type="button"
+              onClick={() => {
+                setMpesaType('paybill');
+                if (!instructions || instructions.includes('Buy Goods') || instructions.includes('Pochi') || instructions.includes('Send Money')) {
+                  setInstructions('Go to M-Pesa > Lipa na M-Pesa > Paybill > Enter Business No: ' + (mpesaNumber || '[Paybill]') + ' > Account No: ' + (paybillAccount || '[Account/Name]') + ' > Enter Amount > Enter PIN > Attach M-Pesa message below.');
+                }
+              }}
+              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                mpesaType === 'paybill'
+                  ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  mpesaType === 'paybill' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Building className="w-4 h-4" />
+                </div>
+                {mpesaType === 'paybill' && <Check className="w-4 h-4 text-emerald-600 font-bold" />}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs">Paybill</div>
+                <div className="text-[10px] text-slate-500">Business &amp; Account No</div>
+              </div>
+            </button>
+
+            {/* 3. Send Money */}
+            <button
+              type="button"
+              onClick={() => {
+                setMpesaType('send_money');
+                if (!instructions || instructions.includes('Buy Goods') || instructions.includes('Paybill') || instructions.includes('Pochi')) {
+                  setInstructions('Go to M-Pesa > Send Money > Enter Phone: ' + (mpesaNumber || '[Phone]') + ' > Enter Amount > Confirm name: ' + (accountName || '[Name]') + ' > Enter PIN > Attach M-Pesa message below.');
+                }
+              }}
+              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                mpesaType === 'send_money'
+                  ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  mpesaType === 'send_money' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                {mpesaType === 'send_money' && <Check className="w-4 h-4 text-emerald-600 font-bold" />}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs">Send Money</div>
+                <div className="text-[10px] text-slate-500">Direct Phone Transfer</div>
+              </div>
+            </button>
+
+            {/* 4. Pochi La Biashara */}
+            <button
+              type="button"
+              onClick={() => {
+                setMpesaType('pochi');
+                if (!instructions || instructions.includes('Buy Goods') || instructions.includes('Paybill') || instructions.includes('Send Money')) {
+                  setInstructions('Go to M-Pesa > Lipa na M-Pesa > Pochi La Biashara > Enter Phone: ' + (mpesaNumber || '[Phone]') + ' > Enter Amount > Confirm ' + (accountName || '[Business Name]') + ' > Enter PIN > Attach M-Pesa message below.');
+                }
+              }}
+              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                mpesaType === 'pochi'
+                  ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  mpesaType === 'pochi' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Briefcase className="w-4 h-4" />
+                </div>
+                {mpesaType === 'pochi' && <Check className="w-4 h-4 text-emerald-600 font-bold" />}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs">Pochi La Biashara</div>
+                <div className="text-[10px] text-slate-500">Merchant Phone Wallet</div>
+              </div>
+            </button>
+          </div>
+
+          {/* Dynamic Configuration Form based on Selected Method */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3.5">
+            {mpesaType === 'till' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Till Number (5 to 7 digits) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 849201"
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Customers pay via Lipa na M-Pesa &gt; Buy Goods and Services
+                  </p>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Store / Till Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SOLARIUM VAULT"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl uppercase font-semibold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Name that appears on customer's phone to verify recipient
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {mpesaType === 'paybill' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Paybill Business No. <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 247247 or 522522"
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Account Number / Reference <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SOLARIUM or YOUR_NAME"
+                    value={paybillAccount}
+                    onChange={(e) => setPaybillAccount(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Business / Company Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Solarium Eyewear Ltd"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold"
+                  />
+                </div>
+              </div>
+            )}
+
+            {mpesaType === 'send_money' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    M-Pesa Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 0712 345 678"
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Customers pay via M-Pesa &gt; Send Money
+                  </p>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Recipient Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Victor Mutwiri (as on M-Pesa)"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Name that appears during confirmation to prevent sending to wrong person
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {mpesaType === 'pochi' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Pochi Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 0712 345 678"
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Customers pay via Lipa na M-Pesa &gt; Pochi La Biashara
+                  </p>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Business / Owner Name on Pochi <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Solarium Shades Pochi"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Confirmation name shown before PIN prompt
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Till Number</label>
-              <input
-                type="text"
-                required
-                value={mpesaNumber}
-                onChange={(e) => setMpesaNumber(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Registered Account Name</label>
-              <input
-                type="text"
-                required
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+              <label className="block font-semibold text-slate-700 mb-1">
+                Customer Payment Instructions Note (Auto-generated or customize)
+              </label>
+              <textarea
+                rows={2}
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 font-mono text-[11px]"
               />
             </div>
           </div>

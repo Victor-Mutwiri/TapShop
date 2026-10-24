@@ -30,7 +30,6 @@ export const OrderTrackerView: React.FC = () => {
         o.id.toUpperCase() === clean ||
         o.id.replace('#', '').toUpperCase() === clean ||
         o.customer.phone.includes(query.trim()) ||
-        (o.collectionPin && o.collectionPin === clean) ||
         o.paymentProof.transactionCode.toUpperCase() === clean
     );
 
@@ -59,7 +58,7 @@ export const OrderTrackerView: React.FC = () => {
             Track Order &amp; Fulfillment
           </h2>
           <p className="text-slate-500 text-[11px] mt-0.5">
-            Enter your Order ID (e.g. <span className="font-mono font-semibold">TAP-9402</span>), phone, or Collection PIN.
+            Enter your Order ID (e.g. <span className="font-mono font-semibold">TAP-9402</span>) or phone number.
           </p>
         </div>
 
@@ -164,7 +163,7 @@ export const OrderTrackerView: React.FC = () => {
               </div>
             </div>
 
-            {/* If Pickup: Show Security Pickup Pass */}
+            {/* If Pickup: Show Shop Pickup Pass */}
             {matchedOrder.customer.fulfillmentType === 'pickup' && (
               <div className="p-4 bg-emerald-950 text-white rounded-2xl border border-emerald-500/30 space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -172,25 +171,25 @@ export const OrderTrackerView: React.FC = () => {
                     <Store className="w-4 h-4" />
                     Shop Pickup Verification Pass
                   </span>
-                  <span className="text-[10px] text-slate-400">Show to Shop Clerk</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Present at Counter</span>
                 </div>
 
                 <div className="p-3 bg-white/10 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] uppercase text-emerald-300 block">
-                      Security Collection PIN
+                    <span className="text-[10px] uppercase text-emerald-300 block font-bold">
+                      Order Reference ID
                     </span>
-                    <span className="text-xl font-bold font-mono text-emerald-400 tracking-wider">
-                      {matchedOrder.collectionPin}
+                    <span className="text-xl font-bold font-mono text-white tracking-wider">
+                      #{matchedOrder.id}
                     </span>
                   </div>
                   <div className="text-right text-[11px] text-slate-300">
-                    Order #{matchedOrder.id}
+                    Station: <strong>{matchedOrder.customer.pickupStationName}</strong>
                   </div>
                 </div>
 
                 <div className="text-[11px] text-slate-300 pt-1">
-                  Station: <strong>{matchedOrder.customer.pickupStationName}</strong>
+                  Show your <strong>Order ID (#{matchedOrder.id})</strong> to the shop clerk to collect your package.
                 </div>
               </div>
             )}

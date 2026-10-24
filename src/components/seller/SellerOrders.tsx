@@ -21,6 +21,7 @@ import {
   Lock,
   X,
   Share2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const SellerOrders: React.FC = () => {
@@ -31,8 +32,10 @@ export const SellerOrders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const [dispatchNote, setDispatchNote] = useState('');
-  const [declineReason, setDeclineReason] = useState('Payment could not be verified in M-Pesa account');
-  const [isDeclining, setIsDeclining] = useState(false);
+  const [declineTargetOrder, setDeclineTargetOrder] = useState<Order | null>(null);
+  const [selectedDeclineReason, setSelectedDeclineReason] = useState('Payment not reflecting in M-Pesa account');
+  const [customDeclineNote, setCustomDeclineNote] = useState('');
+  const [openWhatsAppOnDecline, setOpenWhatsAppOnDecline] = useState(true);
   const [isShipping, setIsShipping] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -50,7 +53,6 @@ export const SellerOrders: React.FC = () => {
       order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.phone.includes(searchQuery) ||
-      (order.collectionPin && order.collectionPin.includes(searchQuery)) ||
       order.paymentProof.transactionCode.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
@@ -63,14 +65,36 @@ export const SellerOrders: React.FC = () => {
 
   const handleCustomerWhatsApp = (order: Order) => {
     const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
-    if (!cleanPhone) return;
+    if (!cleanPhone) {
+      alert('Buyer did not provide a phone number for WhatsApp.');
+      return;
+    }
 
     const isPickup = order.customer.fulfillmentType === 'pickup';
     const message = encodeURIComponent(
       `Hi ${order.customer.fullName}! 👋 Thank you for ordering from ${store.name} (Order #${order.id}).\n\n` +
       (isPickup
-        ? `Your order will be available for pickup at ${order.customer.pickupStationName}.\n🔐 Your Collection PIN is: ${order.collectionPin}.\nKindly present this PIN to the clerk to collect your package.`
+        ? `Your order will be available for pickup at ${order.customer.pickupStationName}.\n📋 To collect your parcel, simply present Order ID #${order.id} to the shop counter clerk.`
         : `Your order is confirmed for delivery to ${order.customer.deliveryAddress}, ${order.customer.city}. We are packing your item for dispatch!`)
+    );
+
+    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDeclineWhatsApp = (order: Order, reason?: string) => {
+    const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
+      alert('Buyer did not provide a phone number for WhatsApp.');
+      return;
+    }
+
+    const r = reason || order.declineReason || 'Payment could not be verified in our M-Pesa account';
+    const message = encodeURIComponent(
+      `Hello ${order.customer.fullName}! 👋\n\n` +
+      `This is ${store.name} regarding your order #${order.id}.\n\n` +
+      `Unfortunately, we are unable to process this order due to the following reason:\n` +
+      `❌ ${r}\n\n` +
+      `If you have already sent payment or have questions, please reply directly with your M-Pesa SMS confirmation and we will be happy to assist you!`
     );
 
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
@@ -84,18 +108,30 @@ export const SellerOrders: React.FC = () => {
   };
 
   const handlePickupReady = (orderId: string) => {
-    markReadyForPickup(orderId, 'Package dropped off at pickup shop counter. Customer can collect with Order ID and PIN.');
+    markReadyForPickup(orderId, 'Package ready at pickup shop counter. Customer can collect with Order ID.');
     if (selectedOrder && selectedOrder.id === orderId) {
       setSelectedOrder({ ...selectedOrder, status: 'ready_for_pickup' });
     }
   };
 
-  const handleDeclineSubmit = (orderId: string) => {
-    declineOrder(orderId, declineReason);
-    setIsDeclining(false);
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: 'declined', declineReason });
+  const handleConfirmDeclineSubmit = () => {
+    if (!declineTargetOrder) return;
+    const finalReason = customDeclineNote.trim()
+      ? `${selectedDeclineReason} (${customDeclineNote.trim()})`
+      : selectedDeclineReason;
+
+    declineOrder(declineTargetOrder.id, finalReason);
+
+    if (openWhatsAppOnDecline) {
+      handleDeclineWhatsApp(declineTargetOrder, finalReason);
     }
+
+    if (selectedOrder && selectedOrder.id === declineTargetOrder.id) {
+      setSelectedOrder({ ...selectedOrder, status: 'declined', declineReason: finalReason });
+    }
+
+    setDeclineTargetOrder(null);
+    setCustomDeclineNote('');
   };
 
   const handleShipSubmit = (orderId: string) => {
@@ -315,15 +351,15 @@ export const SellerOrders: React.FC = () => {
                   {order.items.map((i) => `${i.quantity}x ${i.title}`).join(', ')}
                 </div>
 
-                {/* Security PIN indicator for Shop Pickup */}
-                {isPickup && order.collectionPin && (
-                  <div className="p-2 bg-emerald-950 text-white rounded-xl text-xs flex items-center justify-between">
-                    <span className="text-slate-300 flex items-center gap-1 text-[11px]">
-                      <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                      Collection Security PIN:
+                {/* Shop Pickup Location Info */}
+                {isPickup && order.customer.pickupStationName && (
+                  <div className="p-2 bg-emerald-50 rounded-xl text-xs flex items-center justify-between text-emerald-950 border border-emerald-200">
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-900">
+                      <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      Pickup Hub:
                     </span>
-                    <span className="font-mono font-bold text-emerald-400 text-sm">
-                      {order.collectionPin}
+                    <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[180px]">
+                      {order.customer.pickupStationName}
                     </span>
                   </div>
                 )}
@@ -421,15 +457,15 @@ export const SellerOrders: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Fulfillment & Security PIN */}
+                      {/* Fulfillment Details */}
                       <td className="py-3.5 px-4">
                         {isPickup ? (
                           <div>
-                            <div className="font-medium text-slate-800 truncate max-w-[200px]">
+                            <div className="font-semibold text-slate-800 truncate max-w-[200px]">
                               {order.customer.pickupStationName}
                             </div>
-                            <div className="text-[11px] font-mono text-emerald-700 font-bold flex items-center gap-1">
-                              <Lock className="w-3 h-3" /> PIN: {order.collectionPin}
+                            <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                              <Store className="w-3 h-3" /> Pickup with Order #{order.id}
                             </div>
                           </div>
                         ) : (
@@ -614,28 +650,28 @@ export const SellerOrders: React.FC = () => {
                   )}
                 </div>
 
-                {/* KENYAN FULFILLMENT & SECURITY VERIFICATION */}
+                {/* KENYAN FULFILLMENT VERIFICATION */}
                 {selectedOrder.customer.fulfillmentType === 'pickup' ? (
                   <div className="p-4 bg-emerald-950 text-white rounded-2xl border border-emerald-500/30 space-y-2.5">
                     <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
                       <span className="font-bold text-emerald-400 flex items-center gap-1">
                         <Store className="w-4 h-4" />
-                        Shop Pickup Verification Token
+                        CBD Shop Pickup Fulfillment
                       </span>
-                      <span className="text-[10px] text-slate-400">Security Check</span>
+                      <span className="text-[10px] text-slate-400">Order ID Verification</span>
                     </div>
 
                     <div className="p-2.5 bg-white/10 rounded-xl flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] uppercase text-emerald-300 block">
-                          Customer Collection PIN
+                        <span className="text-[10px] uppercase text-emerald-300 block font-bold">
+                          Pickup Order Reference
                         </span>
                         <span className="text-xl font-bold font-mono text-emerald-400 tracking-wider">
-                          {selectedOrder.collectionPin}
+                          #{selectedOrder.id}
                         </span>
                       </div>
                       <div className="text-right text-[10px] text-slate-300">
-                        Customer must state<br />Order #{selectedOrder.id} &amp; PIN {selectedOrder.collectionPin}
+                        Customer shows Order ID<br />to shop counter clerk
                       </div>
                     </div>
 
@@ -734,10 +770,11 @@ export const SellerOrders: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => setIsDeclining(!isDeclining)}
-                      className="px-3.5 h-11 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-semibold text-xs transition-colors"
+                      onClick={() => setDeclineTargetOrder(selectedOrder)}
+                      className="px-4 h-11 bg-rose-50 hover:bg-rose-100 active:scale-98 text-rose-700 rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5"
                     >
-                      Decline
+                      <XCircle className="w-4 h-4" />
+                      <span>Decline</span>
                     </button>
                   </div>
                 )}
@@ -752,38 +789,22 @@ export const SellerOrders: React.FC = () => {
                   </button>
                 )}
 
-                {/* Decline prompt */}
-                {isDeclining && (
-                  <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 space-y-2 text-xs">
-                    <label className="font-semibold text-rose-900 block">
-                      Select reason to decline order:
-                    </label>
-                    <select
-                      value={declineReason}
-                      onChange={(e) => setDeclineReason(e.target.value)}
-                      className="w-full p-2 bg-white border border-rose-200 rounded-lg text-xs"
-                    >
-                      <option value="Payment not reflecting in M-Pesa account">
-                        Payment not reflecting in M-Pesa account
-                      </option>
-                      <option value="Incorrect amount paid">Incorrect amount paid</option>
-                      <option value="Item out of stock">Item out of stock</option>
-                      <option value="Invalid transaction code">Invalid transaction code</option>
-                    </select>
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => setIsDeclining(false)}
-                        className="px-3 py-1 bg-white border rounded text-slate-600"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleDeclineSubmit(selectedOrder.id)}
-                        className="px-3 py-1 bg-rose-600 text-white rounded font-semibold"
-                      >
-                        Confirm Decline
-                      </button>
+                {selectedOrder.status === 'declined' && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl space-y-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-rose-800 font-bold">
+                      <XCircle className="w-4 h-4 text-rose-600" />
+                      <span>Order Declined</span>
                     </div>
+                    <p className="text-rose-700 text-[11px]">
+                      Reason: <strong>{selectedOrder.declineReason || 'Payment not verified'}</strong>
+                    </p>
+                    <button
+                      onClick={() => handleDeclineWhatsApp(selectedOrder)}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 text-xs transition-all shadow-xs"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Send / Resend Decline Reason to Buyer on WhatsApp</span>
+                    </button>
                   </div>
                 )}
 
@@ -817,6 +838,139 @@ export const SellerOrders: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* COMPACT & ELEGANT DECLINE ORDER MODAL */}
+      {declineTargetOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 p-5 sm:p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 font-display">
+                    Decline Order #{declineTargetOrder.id}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Buyer: {declineTargetOrder.customer.fullName} ({declineTargetOrder.customer.phone})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeclineTargetOrder(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-2">
+                Select Reason for Declining:
+              </label>
+              <div className="space-y-2">
+                {[
+                  {
+                    title: 'Payment not reflecting in M-Pesa account',
+                    desc: 'No matching transaction code found in statement',
+                  },
+                  {
+                    title: 'Incorrect amount paid',
+                    desc: `Amount received is less than total KES ${declineTargetOrder.totalAmount.toLocaleString()}`,
+                  },
+                  {
+                    title: 'Item out of stock',
+                    desc: 'Product sold out or inventory unavailable',
+                  },
+                  {
+                    title: 'Invalid transaction code',
+                    desc: 'Code appears invalid, expired, or duplicate',
+                  },
+                ].map((item) => (
+                  <label
+                    key={item.title}
+                    onClick={() => setSelectedDeclineReason(item.title)}
+                    className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                      selectedDeclineReason === item.title
+                        ? 'border-rose-500 bg-rose-50/60 ring-2 ring-rose-500/10'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="declineReasonRadio"
+                      checked={selectedDeclineReason === item.title}
+                      onChange={() => setSelectedDeclineReason(item.title)}
+                      className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div>
+                      <div className="font-semibold text-xs text-slate-900">{item.title}</div>
+                      <div className="text-[10px] text-slate-500">{item.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Optional note to buyer:
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Please check transaction code or send balance of KES 200"
+                value={customDeclineNote}
+                onChange={(e) => setCustomDeclineNote(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            {/* Direct WhatsApp notify checkbox */}
+            <label className="flex items-start gap-2.5 p-3 bg-emerald-50 rounded-xl border border-emerald-200 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={openWhatsAppOnDecline}
+                onChange={(e) => setOpenWhatsAppOnDecline(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 border-emerald-300"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-emerald-950 block">
+                  Send Decline Reason to Buyer via WhatsApp
+                </span>
+                <span className="text-[11px] text-emerald-800">
+                  Automatically launches WhatsApp with a polite explanation and prompt to verify.
+                </span>
+              </div>
+            </label>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeclineTargetOrder(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeclineSubmit}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold rounded-xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5"
+              >
+                {openWhatsAppOnDecline ? (
+                  <>
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Decline &amp; WhatsApp</span>
+                  </>
+                ) : (
+                  <span>Confirm Decline</span>
+                )}
+              </button>
             </div>
           </div>
         </div>

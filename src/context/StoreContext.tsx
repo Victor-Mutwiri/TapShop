@@ -327,10 +327,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const totalAmount = cartSubtotal + fulfillmentFee;
-    // Generate secure 4-digit Collection PIN for pickup
-    const collectionPin = customer.fulfillmentType === 'pickup'
-      ? Math.floor(1000 + Math.random() * 9000).toString()
-      : undefined;
 
     const newOrder: Order = {
       id: orderId,
@@ -348,7 +344,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       subtotal: cartSubtotal,
       fulfillmentFee,
       totalAmount,
-      collectionPin,
       paymentProof: proof,
     };
 
@@ -374,7 +369,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Notification
     const isPickup = customer.fulfillmentType === 'pickup';
     const notifMessage = isPickup
-      ? `${customer.fullName} placed pickup order ${orderId} (${customer.pickupStationName}). Collection PIN: ${collectionPin}. Verify M-Pesa proof.`
+      ? `${customer.fullName} placed pickup order ${orderId} (${customer.pickupStationName}). Verify M-Pesa proof.`
       : `${customer.fullName} placed delivery order ${orderId} (${customer.city}). Total KES ${totalAmount.toLocaleString()}. Verify M-Pesa proof.`;
 
     const newNotif: StoreNotification = {

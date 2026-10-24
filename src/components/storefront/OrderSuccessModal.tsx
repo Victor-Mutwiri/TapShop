@@ -21,19 +21,9 @@ export const OrderSuccessModal: React.FC = () => {
     setActiveCustomerTab,
   } = useStore();
 
-  const [copiedPin, setCopiedPin] = useState(false);
-
   if (!activePlacedOrder) return null;
 
   const isPickup = activePlacedOrder.customer.fulfillmentType === 'pickup';
-
-  const handleCopyPin = () => {
-    if (activePlacedOrder.collectionPin) {
-      navigator.clipboard.writeText(activePlacedOrder.collectionPin);
-      setCopiedPin(true);
-      setTimeout(() => setCopiedPin(false), 2000);
-    }
-  };
 
   const handleShareToWhatsApp = () => {
     const cleanNumber = store.whatsapp.replace(/[^0-9]/g, '');
@@ -43,7 +33,7 @@ export const OrderSuccessModal: React.FC = () => {
     }
 
     const fulfillmentText = isPickup
-      ? `📍 Pickup Station: ${activePlacedOrder.customer.pickupStationName}\n🔐 Security Collection PIN: ${activePlacedOrder.collectionPin}`
+      ? `📍 Pickup Station: ${activePlacedOrder.customer.pickupStationName}\n📋 Order ID for Collection: #${activePlacedOrder.id}`
       : `🚚 Doorstep Delivery To: ${activePlacedOrder.customer.fullName}, ${activePlacedOrder.customer.deliveryAddress}, ${activePlacedOrder.customer.city}`;
 
     const message = encodeURIComponent(
@@ -56,6 +46,14 @@ export const OrderSuccessModal: React.FC = () => {
     );
 
     window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
+
+  const handleCopyOrderId = () => {
+    navigator.clipboard.writeText(activePlacedOrder.id);
+    setCopiedOrderId(true);
+    setTimeout(() => setCopiedOrderId(false), 2000);
   };
 
   const handleGoToTracking = () => {
@@ -83,7 +81,7 @@ export const OrderSuccessModal: React.FC = () => {
           The seller (<strong>{store.name}</strong>) has been automatically alerted to verify your M-Pesa proof.
         </p>
 
-        {/* SECURITY PICKUP PASS (Crucial Kenyan Shop Pickup Feature) */}
+        {/* SHOP PICKUP COLLECTION PASS */}
         {isPickup ? (
           <div className="mt-4 p-4 bg-emerald-950 text-white rounded-2xl border border-emerald-500/30 text-left space-y-3 shadow-lg">
             <div className="flex items-center justify-between text-xs pb-2 border-b border-white/10">
@@ -94,39 +92,31 @@ export const OrderSuccessModal: React.FC = () => {
               <span className="text-[10px] text-slate-400 font-mono">Present at Counter</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-2.5 bg-white/10 rounded-xl">
-                <span className="text-[10px] uppercase text-slate-300 block">Order Reference</span>
-                <span className="text-base sm:text-lg font-bold font-mono text-white">
+            <div className="p-3 bg-white/10 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase text-emerald-300 block font-bold">
+                  Your Pickup Order ID
+                </span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-white tracking-wider">
                   #{activePlacedOrder.id}
                 </span>
               </div>
-
-              <div className="p-2.5 bg-emerald-500/20 rounded-xl border border-emerald-400/30 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase text-emerald-300 block font-bold">
-                    Collection PIN
-                  </span>
-                  <span className="text-lg sm:text-xl font-bold font-mono text-emerald-400 tracking-wider">
-                    {activePlacedOrder.collectionPin}
-                  </span>
-                </div>
-                <button
-                  onClick={handleCopyPin}
-                  className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white"
-                  title="Copy PIN"
-                >
-                  {copiedPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+              <button
+                onClick={handleCopyOrderId}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg flex items-center gap-1.5 text-xs font-semibold transition-all"
+                title="Copy Order ID"
+              >
+                {copiedOrderId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedOrderId ? 'Copied' : 'Copy'}</span>
+              </button>
             </div>
 
-            <div className="text-[11px] text-slate-300 space-y-0.5 pt-1">
+            <div className="text-[11px] text-slate-300 space-y-1 pt-1">
               <div className="font-semibold text-white">
                 📍 {activePlacedOrder.customer.pickupStationName}
               </div>
-              <div className="text-[10px] text-slate-400">
-                To prevent fraud, the pickup shop clerk will ask for your Order ID and Collection PIN.
+              <div className="text-[10px] text-slate-300">
+                To collect your package, simply show this <strong>Order ID (#{activePlacedOrder.id})</strong> to the shop clerk.
               </div>
             </div>
           </div>

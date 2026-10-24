@@ -17,6 +17,10 @@ import {
   Store,
   ShieldCheck,
   Lock,
+  Smartphone,
+  Building,
+  Tag,
+  Briefcase,
 } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
@@ -39,8 +43,9 @@ export const CheckoutModal: React.FC = () => {
   // Customer contact fields
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [isPhoneOnWhatsApp, setIsPhoneOnWhatsApp] = useState(true);
   const [whatsapp, setWhatsapp] = useState('');
+  const [email, setEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [city, setCity] = useState('Nairobi');
   const [notes, setNotes] = useState('');
@@ -52,10 +57,15 @@ export const CheckoutModal: React.FC = () => {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
   // Statuses
-  const [copiedTill, setCopiedTill] = useState(false);
-  const [copiedAmount, setCopiedAmount] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleCopy = (text: string, fieldKey: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   if (!isCheckoutOpen) return null;
 
@@ -77,18 +87,6 @@ export const CheckoutModal: React.FC = () => {
 
   const totalAmount = cartSubtotal + fulfillmentFee;
   const parsedSms = parseMpesaMessage(rawSms);
-
-  const handleCopyTill = () => {
-    navigator.clipboard.writeText(store.paymentMethods.number);
-    setCopiedTill(true);
-    setTimeout(() => setCopiedTill(false), 2000);
-  };
-
-  const handleCopyAmount = () => {
-    navigator.clipboard.writeText(totalAmount.toString());
-    setCopiedAmount(true);
-    setTimeout(() => setCopiedAmount(false), 2000);
-  };
 
   const handlePasteSampleSms = () => {
     const sample = getSampleMpesaMessage(store.name, totalAmount, store.paymentMethods.number);
@@ -121,6 +119,14 @@ export const CheckoutModal: React.FC = () => {
     }
     if (!email.trim() || !email.includes('@')) {
       newErrors.email = 'Valid email address is required';
+    }
+
+    if (!isPhoneOnWhatsApp) {
+      if (!whatsapp.trim()) {
+        newErrors.whatsapp = 'Please enter your WhatsApp number to receive your order receipt';
+      } else if (whatsapp.trim().length < 9) {
+        newErrors.whatsapp = 'Please enter a valid WhatsApp number';
+      }
     }
 
     if (fulfillmentType === 'delivery' && !deliveryAddress.trim()) {
@@ -165,8 +171,9 @@ export const CheckoutModal: React.FC = () => {
     const customer: CustomerDetails = {
       fullName: fullName.trim(),
       phone: phone.trim(),
+      isPhoneOnWhatsApp,
       email: email.trim(),
-      whatsapp: whatsapp.trim() || phone.trim(),
+      whatsapp: isPhoneOnWhatsApp ? phone.trim() : (whatsapp.trim() || phone.trim()),
       fulfillmentType,
       pickupStationId: fulfillmentType === 'pickup' ? selectedStationId : undefined,
       pickupStationName: fulfillmentType === 'pickup' && selectedStation ? `${selectedStation.name} (${selectedStation.building})` : undefined,
@@ -325,13 +332,13 @@ export const CheckoutModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Anti-Imposter Security Explanation (Solves user's core problem) */}
+                {/* Shop Pickup Verification Notice */}
                 <div className="p-2.5 bg-white rounded-xl border border-emerald-200 flex items-start gap-2 text-[11px] text-emerald-950">
-                  <Lock className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <Store className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="block">Imposter-Proof Verification:</strong>
+                    <strong className="block">Shop Counter Collection:</strong>
                     <span>
-                      Anyone can guess a name at a shop counter. TapShop generates a secure <strong>Unique Order ID</strong> and <strong>4-digit Collection PIN</strong> on your order receipt. The pickup clerk will only release your parcel when you show both.
+                      When your order is ready, simply present your <strong>Order ID</strong> (generated on your receipt) to the shop clerk to collect your package.
                     </span>
                   </div>
                 </div>
@@ -433,7 +440,7 @@ export const CheckoutModal: React.FC = () => {
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">
-                  Phone Number (M-Pesa) <span className="text-rose-500">*</span>
+                  Phone Number (M-Pesa &amp; Contact) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -444,7 +451,23 @@ export const CheckoutModal: React.FC = () => {
                     errors.phone ? 'border-rose-400' : 'border-slate-200'
                   }`}
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Used for M-Pesa verification and order/delivery communication.
+                </p>
                 {errors.phone && <p className="text-[10px] text-rose-500 mt-0.5">{errors.phone}</p>}
+
+                {/* WhatsApp Checkbox Indicator */}
+                <label className="flex items-center gap-2 mt-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isPhoneOnWhatsApp}
+                    onChange={(e) => setIsPhoneOnWhatsApp(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                  />
+                  <span className="text-xs text-slate-700 font-medium">
+                    This number is on WhatsApp <span className="text-emerald-700 font-semibold">(For instant receipts &amp; updates)</span>
+                  </span>
+                </label>
               </div>
 
               <div>
@@ -460,21 +483,33 @@ export const CheckoutModal: React.FC = () => {
                     errors.email ? 'border-rose-400' : 'border-slate-200'
                   }`}
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  We'll email you a copy of your purchase invoice.
+                </p>
                 {errors.email && <p className="text-[10px] text-rose-500 mt-0.5">{errors.email}</p>}
               </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  WhatsApp Number (For Order Updates)
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Same as phone or 07xx..."
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
+              {/* Dedicated WhatsApp field if different from phone */}
+              {!isPhoneOnWhatsApp && (
+                <div className="sm:col-span-2 p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-1">
+                  <label className="block font-medium text-slate-800">
+                    WhatsApp Number (For Order Confirmation &amp; Receipts) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 0722 000 111"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className={`w-full px-3 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-emerald-500 ${
+                      errors.whatsapp ? 'border-rose-400' : 'border-slate-200'
+                    }`}
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    The seller will send your digital receipt, tracking status, and order updates to this WhatsApp.
+                  </p>
+                  {errors.whatsapp && <p className="text-[10px] text-rose-500">{errors.whatsapp}</p>}
+                </div>
+              )}
 
               {/* Delivery Address fields only if delivery chosen */}
               {fulfillmentType === 'delivery' && (
@@ -531,69 +566,226 @@ export const CheckoutModal: React.FC = () => {
             </div>
           </div>
 
-          {/* SECTION 3: M-Pesa Payment Box */}
+          {/* SECTION 3: Kenyan M-Pesa Payment Box */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
                 3
               </span>
               <h3 className="text-xs sm:text-sm font-bold text-slate-900">
-                Pay via Lipa na M-Pesa
+                Pay via {store.paymentMethods.mpesaType === 'send_money' ? 'M-Pesa (Send Money)' : 'Lipa na M-Pesa'}
               </h3>
             </div>
 
             <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-sm space-y-3">
+              {/* Header badge & recipient */}
               <div className="flex items-center justify-between text-xs text-slate-300">
-                <span className="font-semibold text-emerald-400 flex items-center gap-1">
-                  <CreditCard className="w-3.5 h-3.5" />
-                  Lipa na M-Pesa · Buy Goods
+                <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                  {store.paymentMethods.mpesaType === 'till' && <Tag className="w-3.5 h-3.5" />}
+                  {store.paymentMethods.mpesaType === 'paybill' && <Building className="w-3.5 h-3.5" />}
+                  {store.paymentMethods.mpesaType === 'send_money' && <Smartphone className="w-3.5 h-3.5" />}
+                  {store.paymentMethods.mpesaType === 'pochi' && <Briefcase className="w-3.5 h-3.5" />}
+
+                  {store.paymentMethods.mpesaType === 'till' && 'Lipa na M-Pesa · Buy Goods'}
+                  {store.paymentMethods.mpesaType === 'paybill' && 'Lipa na M-Pesa · Paybill'}
+                  {store.paymentMethods.mpesaType === 'send_money' && 'M-Pesa · Send Money'}
+                  {store.paymentMethods.mpesaType === 'pochi' && 'Lipa na M-Pesa · Pochi La Biashara'}
                 </span>
-                <span>Account: {store.paymentMethods.accountName}</span>
+                <span className="font-medium text-slate-300 truncate max-w-[200px]">
+                  {store.paymentMethods.accountName}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
-                {/* Till Number */}
-                <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
-                      Till Number
-                    </span>
-                    <span className="text-base sm:text-lg font-bold font-mono tracking-wider">
-                      {store.paymentMethods.number}
-                    </span>
+              {/* Dynamic copyable parameter cards */}
+              {store.paymentMethods.mpesaType === 'till' && (
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Till Number
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono tracking-wider">
+                        {store.paymentMethods.number}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(store.paymentMethods.number, 'till')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Till"
+                    >
+                      {copiedField === 'till' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyTill}
-                    className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-                    title="Copy Till"
-                  >
-                    {copiedTill ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
 
-                {/* Amount to pay */}
-                <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
-                      Amount
-                    </span>
-                    <span className="text-base sm:text-lg font-bold font-mono text-emerald-400">
-                      KES {totalAmount.toLocaleString()}
-                    </span>
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Exact Amount
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono text-emerald-400">
+                        KES {totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(totalAmount.toString(), 'amount')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Amount"
+                    >
+                      {copiedField === 'amount' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyAmount}
-                    className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-                    title="Copy Amount"
-                  >
-                    {copiedAmount ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
+              )}
 
-              <p className="text-[11px] text-slate-300 leading-normal">
+              {store.paymentMethods.mpesaType === 'paybill' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 pt-1">
+                  <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Paybill Business No.
+                      </span>
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-wider">
+                        {store.paymentMethods.number}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(store.paymentMethods.number, 'paybill')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Business No"
+                    >
+                      {copiedField === 'paybill' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Account Number
+                      </span>
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-wider">
+                        {store.paymentMethods.paybillAccount || store.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(store.paymentMethods.paybillAccount || store.name, 'account')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Account Number"
+                    >
+                      {copiedField === 'account' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Exact Amount
+                      </span>
+                      <span className="text-sm sm:text-base font-bold font-mono text-emerald-400">
+                        KES {totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(totalAmount.toString(), 'amount')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Amount"
+                    >
+                      {copiedField === 'amount' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {store.paymentMethods.mpesaType === 'send_money' && (
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Recipient Mobile No.
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono tracking-wider">
+                        {store.paymentMethods.number}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(store.paymentMethods.number, 'send_money')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Phone"
+                    >
+                      {copiedField === 'send_money' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Exact Amount
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono text-emerald-400">
+                        KES {totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(totalAmount.toString(), 'amount')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Amount"
+                    >
+                      {copiedField === 'amount' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {store.paymentMethods.mpesaType === 'pochi' && (
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Pochi Mobile Number
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono tracking-wider">
+                        {store.paymentMethods.number}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(store.paymentMethods.number, 'pochi')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Pochi Phone"
+                    >
+                      {copiedField === 'pochi' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
+                        Exact Amount
+                      </span>
+                      <span className="text-base sm:text-lg font-bold font-mono text-emerald-400">
+                        KES {totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(totalAmount.toString(), 'amount')}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Copy Amount"
+                    >
+                      {copiedField === 'amount' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Instructions text */}
+              <p className="text-[11px] text-slate-300 leading-normal bg-white/5 p-2.5 rounded-xl border border-white/5">
                 {store.paymentMethods.instructions}
               </p>
             </div>

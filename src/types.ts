@@ -1,7 +1,10 @@
+export type MpesaPaymentType = 'till' | 'paybill' | 'send_money' | 'pochi';
+
 export interface PaymentMethods {
-  mpesaType: 'till' | 'paybill' | 'send_money';
+  mpesaType: MpesaPaymentType;
   number: string;
   accountName: string;
+  paybillAccount?: string; // Specific account number for Paybill
   instructions: string;
 }
 
@@ -72,6 +75,7 @@ export type DeliveryZoneType = 'nairobi' | 'upcountry' | 'custom';
 export interface CustomerDetails {
   fullName: string;
   phone: string; // Required for M-Pesa & delivery
+  isPhoneOnWhatsApp?: boolean;
   email: string;
   whatsapp?: string;
   fulfillmentType: FulfillmentType;

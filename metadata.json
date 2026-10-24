@@ -1,0 +1,6 @@
+{
+  "name": "TapShop - Instant Social Media Bio Stores",
+  "description": "Turn Instagram, TikTok, and Facebook DMs into automated sales with custom bio-link storefronts, live inventory, and seamless M-Pesa proof checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

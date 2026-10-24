@@ -64,8 +64,73 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeView, setActiveView] = useState<AppViewMode>('storefront');
-  const [activeCustomerTab, setActiveCustomerTab] = useState<'catalog' | 'track'>('catalog');
+  // Resolve initial view from URL hash, pathname, or localStorage to prevent refresh reset
+  const getInitialView = (): AppViewMode => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
+      if (hash.includes('seller') || pathname.includes('seller')) return 'seller_dashboard';
+      if (hash.includes('landing') || pathname.includes('landing')) return 'landing';
+      if (hash.includes('store') || pathname.includes('store')) return 'storefront';
+      try {
+        const saved = localStorage.getItem('tapshop_active_view');
+        if (saved === 'seller_dashboard' || saved === 'storefront' || saved === 'landing') {
+          return saved as AppViewMode;
+        }
+      } catch {}
+    }
+    return 'storefront';
+  };
+
+  const getInitialCustomerTab = (): 'catalog' | 'track' => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('track')) return 'track';
+    }
+    return 'catalog';
+  };
+
+  const [activeView, setActiveView] = useState<AppViewMode>(getInitialView);
+  const [activeCustomerTab, setActiveCustomerTab] = useState<'catalog' | 'track'>(getInitialCustomerTab);
+
+  // Sync route and hash on view change to ensure refresh stays on current page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tapshop_active_view', activeView);
+      const targetHash =
+        activeView === 'seller_dashboard'
+          ? '#/seller'
+          : activeView === 'landing'
+          ? '#/landing'
+          : activeCustomerTab === 'track'
+          ? '#/track'
+          : '#/store';
+      if (window.location.hash !== targetHash) {
+        window.history.replaceState(null, '', targetHash);
+      }
+    }
+  }, [activeView, activeCustomerTab]);
+
+  // Listen to browser forward/back buttons
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('seller')) {
+        setActiveView('seller_dashboard');
+      } else if (hash.includes('landing')) {
+        setActiveView('landing');
+      } else if (hash.includes('track')) {
+        setActiveView('storefront');
+        setActiveCustomerTab('track');
+      } else if (hash.includes('store')) {
+        setActiveView('storefront');
+        setActiveCustomerTab('catalog');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const [store, setStore] = useState<Store>(() => {
     try {

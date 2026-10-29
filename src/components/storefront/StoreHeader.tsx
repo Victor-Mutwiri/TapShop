@@ -75,29 +75,37 @@ export const StoreHeader: React.FC = () => {
       </div>
 
       {/* Profile & Store Info Container */}
-      <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pb-4">
+      <div className="relative z-20 max-w-4xl mx-auto px-3.5 sm:px-6 pb-4">
         {/* Avatar + Main Identity Row */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between -mt-10 sm:-mt-14 mb-3 sm:mb-4 gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-3 sm:mb-4 gap-3">
           <div className="flex items-end gap-3 w-full sm:w-auto">
-            <div className="relative w-18 h-18 sm:w-24 sm:h-24 rounded-2xl p-1 bg-white shadow-md border border-slate-200 overflow-hidden shrink-0">
-              <img
-                src={store.logo}
-                alt={store.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover rounded-xl"
-              />
+            {/* Avatar Badge - ONLY the avatar floats over banner seam */}
+            <div className="-mt-10 sm:-mt-14 relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl p-1 bg-white shadow-lg border-2 border-white overflow-hidden shrink-0">
+              {store.logo ? (
+                <img
+                  src={store.logo}
+                  alt={store.name}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <div className="w-full h-full rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl">
+                  {store.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
             </div>
 
-            <div className="pb-0.5 flex-1 min-w-0">
+            {/* Store Name & Handle - clearly in white content area below banner */}
+            <div className="pt-2 sm:pb-0.5 flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 font-display truncate">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 font-display">
                   {store.name}
                 </h1>
                 <span title="Verified Kenyan Social Merchant" className="inline-flex">
                   <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
                 </span>
               </div>
-              <p className="text-xs font-mono text-slate-500 truncate">
+              <p className="text-xs font-mono font-medium text-slate-500 truncate">
                 tapshop.co/@{store.handle}
               </p>
             </div>

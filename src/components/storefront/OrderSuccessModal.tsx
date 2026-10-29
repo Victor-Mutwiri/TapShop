@@ -11,9 +11,7 @@ import {
   Copy,
   Check,
   Lock,
-  FileText,
 } from 'lucide-react';
-import { OrderReceiptModal } from '../common/OrderReceiptModal';
 
 export const OrderSuccessModal: React.FC = () => {
   const {
@@ -24,7 +22,6 @@ export const OrderSuccessModal: React.FC = () => {
   } = useStore();
 
   const [copiedOrderId, setCopiedOrderId] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   if (!activePlacedOrder) return null;
 
@@ -158,15 +155,6 @@ export const OrderSuccessModal: React.FC = () => {
             <span>Send Order Pass to Seller's WhatsApp</span>
           </button>
 
-          {/* View / Download Official Receipt */}
-          <button
-            onClick={() => setShowReceiptModal(true)}
-            className="w-full h-10 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
-          >
-            <FileText className="w-4 h-4 text-emerald-400" />
-            <span>View / Download Official Receipt</span>
-          </button>
-
           <div className="flex items-center gap-2">
             <button
               onClick={handleGoToTracking}
@@ -184,16 +172,6 @@ export const OrderSuccessModal: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Official Receipt Modal for Customer */}
-      {showReceiptModal && (
-        <OrderReceiptModal
-          order={activePlacedOrder}
-          store={store}
-          viewerRole="customer"
-          onClose={() => setShowReceiptModal(false)}
-        />
-      )}
     </div>
   );
 };

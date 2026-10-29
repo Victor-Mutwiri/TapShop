@@ -379,17 +379,20 @@ export const SellerOrders: React.FC = () => {
                       <MessageCircle className="w-3.5 h-3.5" />
                       <span>WhatsApp</span>
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReceiptOrder(order);
-                      }}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1 font-semibold text-[11px] transition-colors"
-                      title="Generate and send receipt"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-slate-600" />
-                      <span>Receipt</span>
-                    </button>
+                    {/* Verified Receipt Button - Only shown when payment is verified */}
+                    {order.status !== 'pending' && order.status !== 'declined' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReceiptOrder(order);
+                        }}
+                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg flex items-center gap-1 font-semibold text-[11px] transition-colors border border-emerald-200/60"
+                        title="Generate and send verified PDF receipt"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>PDF Receipt</span>
+                      </button>
+                    )}
                     <a
                       href={`tel:${order.customer.phone.replace(/\s+/g, '')}`}
                       onClick={(e) => e.stopPropagation()}
@@ -539,17 +542,19 @@ export const SellerOrders: React.FC = () => {
                       {/* Action */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReceiptOrder(order);
-                            }}
-                            className="px-2 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg inline-flex items-center gap-1 transition-colors"
-                            title="Generate and send receipt"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Receipt</span>
-                          </button>
+                          {order.status !== 'pending' && order.status !== 'declined' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReceiptOrder(order);
+                              }}
+                              className="px-2 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg inline-flex items-center gap-1 transition-colors border border-emerald-200/60"
+                              title="Generate and send verified PDF receipt"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>PDF Receipt</span>
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -864,24 +869,33 @@ export const SellerOrders: React.FC = () => {
                   </div>
                 )}
 
-                {/* Always Available Action: View & Send Formal Digital Receipt */}
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                  <button
-                    onClick={() => setReceiptOrder(selectedOrder)}
-                    className="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
-                  >
-                    <FileText className="w-4 h-4 text-emerald-400" />
-                    <span>Generate &amp; Send Sales Receipt</span>
-                  </button>
-                  <button
-                    onClick={() => handleCustomerWhatsApp(selectedOrder)}
-                    className="h-10 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-colors border border-emerald-200"
-                    title="Direct WhatsApp"
-                  >
-                    <MessageCircle className="w-4 h-4 text-emerald-600" />
-                    <span className="hidden sm:inline">WhatsApp</span>
-                  </button>
-                </div>
+                {/* Verified Order Receipt Generation - Only available after merchant verifies payment proof */}
+                {selectedOrder.status !== 'pending' && selectedOrder.status !== 'declined' ? (
+                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                    <button
+                      onClick={() => setReceiptOrder(selectedOrder)}
+                      className="flex-1 h-10 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
+                    >
+                      <FileText className="w-4 h-4 text-white" />
+                      <span>Generate &amp; Send PDF Receipt</span>
+                    </button>
+                    <button
+                      onClick={() => handleCustomerWhatsApp(selectedOrder)}
+                      className="h-10 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-colors border border-emerald-200"
+                      title="Direct WhatsApp"
+                    >
+                      <MessageCircle className="w-4 h-4 text-emerald-600" />
+                      <span className="hidden sm:inline">WhatsApp</span>
+                    </button>
+                  </div>
+                ) : selectedOrder.status === 'pending' ? (
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Official PDF receipt unlocks once you verify M-Pesa proof and confirm order above.
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

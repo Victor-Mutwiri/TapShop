@@ -12,16 +12,13 @@ import {
   ArrowLeft,
   Store,
   Lock,
-  FileText,
 } from 'lucide-react';
-import { OrderReceiptModal } from '../common/OrderReceiptModal';
 
 export const OrderTrackerView: React.FC = () => {
-  const { orders, store, setActiveCustomerTab } = useStore();
+  const { orders, setActiveCustomerTab } = useStore();
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [matchedOrder, setMatchedOrder] = useState<Order | null>(null);
-  const [showReceipt, setShowReceipt] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,30 +230,9 @@ export const OrderTrackerView: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Official Receipt Action */}
-            <div className="pt-2">
-              <button
-                onClick={() => setShowReceipt(true)}
-                className="w-full h-10 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
-              >
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <span>View Official Digital Receipt</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
-
-      {/* Customer Receipt Modal */}
-      {showReceipt && matchedOrder && (
-        <OrderReceiptModal
-          order={matchedOrder}
-          store={store}
-          viewerRole="customer"
-          onClose={() => setShowReceipt(false)}
-        />
-      )}
     </div>
   );
 };

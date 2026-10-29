@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Order, Store as StoreType } from '../../types';
+import { jsPDF } from 'jspdf';
 import {
   X,
   Printer,
   Share2,
   MessageCircle,
-  Copy,
-  Check,
+  Download,
   CheckCircle2,
-  Clock,
   Store,
   Truck,
   ShieldCheck,
-  Download,
+  FileCheck,
+  AlertCircle,
 } from 'lucide-react';
 
 interface OrderReceiptModalProps {
@@ -28,8 +28,8 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
   onClose,
   viewerRole = 'seller',
 }) => {
-  const [copiedText, setCopiedText] = useState(false);
-  const [sharedToast, setSharedToast] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isPickup = order.customer.fulfillmentType === 'pickup';
   const formattedDate = new Date(order.createdAt).toLocaleString('en-KE', {
@@ -37,88 +37,283 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
     timeStyle: 'short',
   });
 
-  // Generate plain text receipt format (ideal for DM, SMS, or WhatsApp)
-  const generateReceiptText = () => {
-    const divider = '------------------------------------------';
-    const itemsList = order.items
-      .map(
-        (i) =>
-          `• ${i.quantity}x ${i.title}\n   @ KES ${i.price.toLocaleString()} = KES ${(
-            i.quantity * i.price
-          ).toLocaleString()}`
-      )
-      .join('\n');
+  // Generate standardized, professional vector PDF using jsPDF
+  const generatePdf = (): jsPDF => {
+    // Standard A5 receipt slip format (148mm x 210mm)
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a5',
+    });
 
-    const fulfillmentDetails = isPickup
-      ? `Pickup Point: ${order.customer.pickupStationName || 'CBD Hub'}\n(Collect with Order ID #${order.id})`
-      : `Doorstep Delivery: ${order.customer.deliveryAddress}, ${order.customer.city}`;
+    const pageWidth = 148;
+    const margin = 12;
+    const contentWidth = pageWidth - margin * 2;
 
-    return `🧾 *OFFICIAL SALE RECEIPT - ${store.name.toUpperCase()}*\n` +
-      `Receipt No: REC-${order.id.replace('#', '')}\n` +
-      `Date: ${formattedDate}\n` +
-      `Status: ${order.status.toUpperCase()} (M-Pesa Verified)\n` +
-      `${divider}\n` +
-      `*CUSTOMER DETAILS:*\n` +
-      `Name: ${order.customer.fullName}\n` +
-      `Phone: ${order.customer.phone}\n` +
-      `${fulfillmentDetails}\n` +
-      `${divider}\n` +
-      `*ITEMS ORDERED:*\n` +
-      `${itemsList}\n` +
-      `${divider}\n` +
-      `Subtotal: KES ${order.subtotal.toLocaleString()}\n` +
-      `Fulfillment Fee: KES ${order.fulfillmentFee.toLocaleString()}\n` +
-      `*TOTAL PAID: KES ${order.totalAmount.toLocaleString()}*\n` +
-      `${divider}\n` +
-      `*PAYMENT VERIFICATION:*\n` +
-      `Payment Method: M-Pesa (${store.paymentMethods.mpesaType.toUpperCase()} ${store.paymentMethods.number})\n` +
-      `M-Pesa Ref Code: ${order.paymentProof.transactionCode}\n` +
-      `${divider}\n` +
-      `Merchant: ${store.name} | Phone: ${store.phone}\n` +
-      `Storefront: tapshop.co/@${store.handle}\n` +
-      `Asante sana for shopping with us! ✨`;
-  };
+    // 1. Dark Merchant Banner Header
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 28, 'F');
 
-  const handleCopyReceiptText = () => {
-    navigator.clipboard.writeText(generateReceiptText());
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2200);
-  };
+    // Accent line
+    doc.setFillColor(16, 185, 129); // emerald-500
+    doc.rect(0, 27, pageWidth, 1.5, 'F');
 
-  const handleSendViaWhatsApp = () => {
-    const text = encodeURIComponent(generateReceiptText());
-    // If seller is viewing, send to customer's WhatsApp
-    // If customer is viewing, send to seller's WhatsApp
-    const targetNumber =
-      viewerRole === 'seller'
-        ? (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '')
-        : store.whatsapp.replace(/[^0-9]/g, '');
+    // Store Name
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text(store.name, margin, 12);
 
-    if (!targetNumber) {
-      alert('Recipient WhatsApp number is not available.');
-      return;
+    // Store Handle & Verification
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(203, 213, 225); // slate-300
+    doc.text(`tapshop.co/@${store.handle}  |  VERIFIED KENYAN SOCIAL MERCHANT`, margin, 18);
+
+    if (store.slogan) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text(store.slogan.slice(0, 70), margin, 23);
     }
 
-    window.open(`https://wa.me/${targetNumber}?text=${text}`, '_blank', 'noopener,noreferrer');
+    // 2. Business Contact strip
+    let currentY = 34;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105); // slate-600
+
+    const contactLine = `Tel: ${store.phone}   |   WhatsApp: ${store.whatsapp}${
+      store.physicalLocation ? `   |   Location: ${store.physicalLocation.slice(0, 45)}` : ''
+    }`;
+    doc.text(contactLine, margin, currentY);
+
+    // 3. Receipt Metadata Box
+    currentY += 4;
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.roundedRect(margin, currentY, contentWidth, 18, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text('OFFICIAL CASH SALE RECEIPT', margin + 4, currentY + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(5, 150, 105); // emerald-600
+    doc.text(`REC-${order.id.replace('#', '')}`, margin + 4, currentY + 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Date: ${formattedDate}`, margin + 70, currentY + 6);
+    doc.text(`Payment: M-PESA VERIFIED`, margin + 70, currentY + 12);
+
+    // 4. Customer & Fulfillment Information
+    currentY += 22;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, currentY, contentWidth, 20, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('BILLED / ISSUED TO:', margin + 4, currentY + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(order.customer.fullName, margin + 4, currentY + 10);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Phone: ${order.customer.phone}`, margin + 4, currentY + 15);
+
+    // Fulfillment Details
+    const fulfillmentLabel = isPickup
+      ? `Pickup: ${order.customer.pickupStationName || 'CBD Hub'} (Order #${order.id})`
+      : `Delivery: ${order.customer.deliveryAddress}, ${order.customer.city}`;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(fulfillmentLabel.slice(0, 48), margin + 60, currentY + 10);
+
+    // 5. Items Table Header
+    currentY += 24;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, currentY, contentWidth, 6, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('ITEM DESCRIPTION', margin + 3, currentY + 4.2);
+    doc.text('QTY', margin + 78, currentY + 4.2);
+    doc.text('PRICE', margin + 92, currentY + 4.2);
+    doc.text('TOTAL', margin + 110, currentY + 4.2);
+
+    // 6. Items Table Body
+    currentY += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+
+    order.items.forEach((item) => {
+      doc.text(item.title.slice(0, 36), margin + 3, currentY + 3.5);
+      doc.text(item.quantity.toString(), margin + 80, currentY + 3.5);
+      doc.text(`${item.price.toLocaleString()}`, margin + 92, currentY + 3.5);
+      doc.text(`${(item.price * item.quantity).toLocaleString()}`, margin + 110, currentY + 3.5);
+
+      currentY += 6;
+      doc.setDrawColor(241, 245, 249);
+      doc.line(margin, currentY, margin + contentWidth, currentY);
+    });
+
+    // 7. Totals Section
+    currentY += 3;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Subtotal:', margin + 75, currentY + 3.5);
+    doc.text(`KES ${order.subtotal.toLocaleString()}`, margin + 105, currentY + 3.5);
+
+    currentY += 5;
+    doc.text(isPickup ? 'Pickup Station Fee:' : 'Delivery Rider Fee:', margin + 75, currentY + 3.5);
+    doc.text(
+      order.fulfillmentFee === 0 ? 'FREE' : `KES ${order.fulfillmentFee.toLocaleString()}`,
+      margin + 105,
+      currentY + 3.5
+    );
+
+    currentY += 5.5;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(margin + 65, currentY, contentWidth - 65, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('TOTAL PAID:', margin + 68, currentY + 5);
+    doc.setTextColor(5, 150, 105);
+    doc.text(`KES ${order.totalAmount.toLocaleString()}`, margin + 103, currentY + 5);
+
+    // 8. Official M-Pesa Stamp Box
+    currentY += 12;
+    doc.setFillColor(236, 253, 245); // emerald-50
+    doc.setDrawColor(167, 243, 208); // emerald-200
+    doc.roundedRect(margin, currentY, contentWidth, 16, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(6, 95, 70); // emerald-800
+    doc.text('✓ M-PESA PAYMENT VERIFIED & CONFIRMED', margin + 4, currentY + 5.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(4, 120, 87);
+    doc.text(`Ref Code: ${order.paymentProof.transactionCode}`, margin + 4, currentY + 11.5);
+    doc.text(
+      `Account: ${store.paymentMethods.mpesaType.toUpperCase()} ${store.paymentMethods.number} (${store.paymentMethods.accountName})`,
+      margin + 50,
+      currentY + 11.5
+    );
+
+    // 9. Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      'Official computer-generated sales voucher issued via TapShop Kenya. Asante sana for your business!',
+      pageWidth / 2,
+      202,
+      { align: 'center' }
+    );
+
+    return doc;
   };
 
-  const handleShareToSocials = async () => {
-    const receiptText = generateReceiptText();
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Receipt #${order.id} - ${store.name}`,
-          text: receiptText,
-        });
-      } catch (err) {
-        // User cancelled or share failed, fallback to copy
-        handleCopyReceiptText();
+  const handleDownloadPdf = () => {
+    try {
+      const doc = generatePdf();
+      doc.save(`Receipt-${order.id}.pdf`);
+      setDownloadSuccess(true);
+      setStatusMessage(`PDF Receipt downloaded as Receipt-${order.id}.pdf`);
+      setTimeout(() => {
+        setDownloadSuccess(false);
+        setStatusMessage(null);
+      }, 3500);
+    } catch (err) {
+      console.error('PDF generation error', err);
+      alert('Unable to generate PDF receipt. Please try printing instead.');
+    }
+  };
+
+  const handleSendPdfToWhatsApp = () => {
+    try {
+      // 1. Download the PDF document immediately to merchant's files
+      const doc = generatePdf();
+      doc.save(`Receipt-${order.id}.pdf`);
+
+      // 2. Open WhatsApp to customer with prefilled notification
+      const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
+      if (!cleanPhone) {
+        alert('Buyer WhatsApp number is not available.');
+        return;
       }
-    } else {
-      // Fallback: Copy to clipboard and show toast
-      navigator.clipboard.writeText(receiptText);
-      setSharedToast(true);
-      setTimeout(() => setSharedToast(false), 2500);
+
+      const text = encodeURIComponent(
+        `Hello ${order.customer.fullName}! 👋\n\n` +
+        `This is ${store.name}. Your payment for Order #${order.id} has been verified! ✅\n\n` +
+        `📄 We have generated your official Sales Receipt (Receipt #REC-${order.id.replace('#', '')}).\n` +
+        `💰 Total Paid: KES ${order.totalAmount.toLocaleString()}\n` +
+        `📱 M-Pesa Code: ${order.paymentProof.transactionCode}\n\n` +
+        `Attached is your official PDF receipt. Asante sana for shopping with us!`
+      );
+
+      setStatusMessage(
+        `Receipt-${order.id}.pdf has been downloaded! You can now attach this PDF in the opened WhatsApp chat.`
+      );
+
+      setTimeout(() => {
+        window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank', 'noopener,noreferrer');
+      }, 500);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    try {
+      const doc = generatePdf();
+      const pdfBlob = doc.output('blob');
+      const pdfFile = new File([pdfBlob], `Receipt-${order.id}.pdf`, {
+        type: 'application/pdf',
+      });
+
+      // Check if browser Web Share API supports file sharing
+      if (
+        navigator.canShare &&
+        navigator.canShare({ files: [pdfFile] })
+      ) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `Receipt #${order.id} - ${store.name}`,
+          text: `Official sales receipt for Order #${order.id} from ${store.name}.`,
+        });
+        setStatusMessage('Receipt PDF shared successfully!');
+        setTimeout(() => setStatusMessage(null), 3000);
+      } else {
+        // Fallback for browsers that don't support file sharing
+        doc.save(`Receipt-${order.id}.pdf`);
+        setStatusMessage(
+          `PDF Receipt downloaded to your device! You can now send it to Instagram DMs, TikTok DMs, or WhatsApp.`
+        );
+        setTimeout(() => setStatusMessage(null), 4500);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        handleDownloadPdf();
+      }
     }
   };
 
@@ -132,9 +327,9 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
         {/* Modal Top Control Bar (Hidden on print) */}
         <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
             <span className="text-xs sm:text-sm font-bold font-display">
-              Official Sales Receipt &amp; Voucher
+              Official Verified Sales Receipt (PDF)
             </span>
           </div>
 
@@ -142,10 +337,10 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             <button
               onClick={handlePrint}
               className="p-1.5 sm:px-2.5 sm:py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              title="Print Receipt or Save as PDF"
+              title="Print Receipt"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Print / PDF</span>
+              <span className="hidden sm:inline">Print</span>
             </button>
             <button
               onClick={onClose}
@@ -157,7 +352,15 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
           </div>
         </div>
 
-        {/* Printable / Viewable Receipt Slip Content */}
+        {/* Status / Instruction Notification Banner */}
+        {statusMessage && (
+          <div className="p-3 bg-emerald-50 border-b border-emerald-200 text-emerald-900 text-xs flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-medium">{statusMessage}</span>
+          </div>
+        )}
+
+        {/* Viewable Receipt Slip Content (Preview) */}
         <div className="p-4 sm:p-7 overflow-y-auto space-y-5 bg-slate-50/50 print:p-0 print:bg-white text-xs">
           {/* RECEIPT PAPER CONTAINER */}
           <div className="bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-xs space-y-4 max-w-lg mx-auto print:border-none print:shadow-none print:p-0">
@@ -201,7 +404,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             <div className="flex items-center justify-between py-2 border-b border-dashed border-slate-200 text-xs">
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">
-                  Receipt No:
+                  Official Receipt No:
                 </span>
                 <span className="font-mono font-bold text-slate-900 text-sm">
                   REC-{order.id.replace('#', '')}
@@ -209,7 +412,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
               </div>
               <div className="text-right">
                 <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">
-                  Date &amp; Time:
+                  Date Verified:
                 </span>
                 <span className="text-slate-700 font-medium">
                   {formattedDate}
@@ -220,7 +423,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             {/* Customer & Fulfillment Info */}
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5 text-[11px]">
               <div className="flex justify-between">
-                <span className="text-slate-500">Billed To:</span>
+                <span className="text-slate-500">Billed / Issued To:</span>
                 <span className="font-bold text-slate-900">{order.customer.fullName}</span>
               </div>
               <div className="flex justify-between">
@@ -322,51 +525,47 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
             {/* Footer Notice */}
             <div className="text-center pt-3 border-t border-dashed border-slate-200 text-[10px] text-slate-400 space-y-0.5">
-              <p>Official computer-generated receipt issued via TapShop Kenya.</p>
+              <p>Official vector PDF receipt generated via TapShop Kenya.</p>
               <p className="font-semibold text-slate-500">Asante sana for your business! ✨</p>
             </div>
           </div>
         </div>
 
         {/* Modal Bottom Action Controls (Hidden on print) */}
-        <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 shrink-0 space-y-2 print:hidden">
+        <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 shrink-0 space-y-2.5 print:hidden">
           {/* Primary Action Buttons */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {/* WhatsApp Send button */}
             <button
-              onClick={handleSendViaWhatsApp}
-              className="w-full h-10 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+              onClick={handleSendPdfToWhatsApp}
+              className="w-full h-11 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
             >
-              <MessageCircle className="w-4 h-4" />
-              <span>
-                {viewerRole === 'seller' ? 'Send to Customer WhatsApp' : 'Send to Store WhatsApp'}
-              </span>
+              <MessageCircle className="w-4 h-4 shrink-0" />
+              <span>Send PDF to Buyer's WhatsApp</span>
             </button>
 
-            {/* Social Media / Web Share button */}
+            {/* Social Media / Native PDF Share */}
             <button
-              onClick={handleShareToSocials}
-              className="w-full h-10 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+              onClick={handleSharePdf}
+              className="w-full h-11 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
             >
-              <Share2 className="w-4 h-4" />
-              <span>Share to Socials / DM</span>
+              <Share2 className="w-4 h-4 shrink-0" />
+              <span>Share PDF to Instagram / Socials</span>
             </button>
 
-            {/* Copy Receipt Text button */}
+            {/* Download PDF button */}
             <button
-              onClick={handleCopyReceiptText}
-              className="w-full h-10 px-3 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-200"
+              onClick={handleDownloadPdf}
+              className="w-full h-11 px-3 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
             >
-              {copiedText ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
-              <span>{copiedText ? 'Receipt Text Copied!' : 'Copy Formatted Slip'}</span>
+              <Download className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>{downloadSuccess ? 'PDF Downloaded!' : 'Download PDF Receipt'}</span>
             </button>
           </div>
 
-          {sharedToast && (
-            <div className="text-center text-[11px] font-semibold text-indigo-700 bg-indigo-50 py-1 rounded-lg animate-in fade-in">
-              Receipt summary copied! Ready to paste into Instagram, TikTok, or Twitter DMs.
-            </div>
-          )}
+          <div className="text-center text-[11px] text-slate-500">
+            Exported as a clean vector <strong className="text-slate-700 font-semibold">.pdf</strong> file formatted for mobile and desktop screens.
+          </div>
         </div>
       </div>
     </div>

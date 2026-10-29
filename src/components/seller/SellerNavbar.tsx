@@ -37,8 +37,12 @@ export const SellerNavbar: React.FC<SellerNavbarProps> = ({ activeTab, setActive
       <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
         {/* Brand & Store Profile */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold font-display shadow-xs shrink-0 text-xs sm:text-base">
-            TS
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-slate-900 text-white flex items-center justify-center font-bold font-display shadow-xs shrink-0 text-xs sm:text-base border border-slate-200">
+            {store.logo ? (
+              <img src={store.logo} alt={store.name} className="w-full h-full object-cover" />
+            ) : (
+              store.name.slice(0, 2).toUpperCase()
+            )}
           </div>
           <div className="leading-tight min-w-0">
             <div className="flex items-center gap-1.5">

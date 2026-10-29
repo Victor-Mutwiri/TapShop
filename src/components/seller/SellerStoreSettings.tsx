@@ -14,6 +14,9 @@ import {
   Save,
   Check,
   Smartphone,
+  Image as ImageIcon,
+  Upload,
+  RefreshCw,
   Building,
   Tag,
   Briefcase,
@@ -23,6 +26,7 @@ import { MpesaPaymentType } from '../../types';
 export const SellerStoreSettings: React.FC = () => {
   const { store, updateStore } = useStore();
 
+  const [logo, setLogo] = useState(store.logo);
   const [name, setName] = useState(store.name);
   const [handle, setHandle] = useState(store.handle);
   const [slogan, setSlogan] = useState(store.slogan);
@@ -32,6 +36,24 @@ export const SellerStoreSettings: React.FC = () => {
   const [physicalLocation, setPhysicalLocation] = useState(store.physicalLocation || '');
   const [operatingHours, setOperatingHours] = useState(store.operatingHours || '');
   const [instagram, setInstagram] = useState(store.instagram);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Please choose an image under 4MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setLogo(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Kenyan M-Pesa Options (Till, Paybill, Send Money, Pochi La Biashara)
   const [mpesaType, setMpesaType] = useState<MpesaPaymentType>(store.paymentMethods.mpesaType || 'till');
@@ -89,6 +111,7 @@ export const SellerStoreSettings: React.FC = () => {
     e.preventDefault();
 
     updateStore({
+      logo: logo.trim(),
       name: name.trim(),
       handle: handle.trim().toLowerCase().replace(/[^a-z0-9-_]/g, ''),
       slogan: slogan.trim(),
@@ -144,6 +167,83 @@ export const SellerStoreSettings: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* BUSINESS ICON & BRAND LOGO UPLOADER */}
+        <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-emerald-600" />
+              <span>Business Icon &amp; Brand Logo</span>
+            </h3>
+            <span className="text-[11px] text-slate-500">Appears on Storefront, Header &amp; Receipts</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 pt-1">
+            {/* Logo Preview */}
+            <div className="relative group shrink-0">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-emerald-500/40 p-1 bg-white shadow-md overflow-hidden flex items-center justify-center">
+                {logo ? (
+                  <img
+                    src={logo}
+                    alt="Store Logo"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl">
+                    {name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <span className="absolute -bottom-1.5 -right-1.5 px-1.5 py-0.5 bg-emerald-600 text-white text-[9px] font-bold rounded-md shadow-xs">
+                Active
+              </span>
+            </div>
+
+            {/* Upload Controls */}
+            <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+              <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl font-bold text-xs shadow-xs transition-all">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Custom Logo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {logo && (
+                  <button
+                    type="button"
+                    onClick={() => setLogo('')}
+                    className="px-3 py-2 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-200 rounded-xl font-medium text-xs transition-colors"
+                  >
+                    Remove Logo
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                Recommended: Square PNG, JPG or WEBP (at least 300x300px, max 4MB).
+              </p>
+
+              {/* Direct Image URL input option */}
+              <div className="pt-1">
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">
+                  Or Image Web URL:
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={logo.startsWith('data:') ? '' : logo}
+                  onChange={(e) => setLogo(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* MANDATORY BUSINESS CONTACT & PHYSICAL LOCATION */}
         <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">

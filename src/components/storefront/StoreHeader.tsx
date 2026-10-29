@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { buildWhatsAppLink } from '../../utils/phoneUtils';
 import {
   ShoppingBag,
   MessageCircle,
@@ -20,19 +21,16 @@ export const StoreHeader: React.FC = () => {
   const { store, cartCount, setIsCartOpen, activeCustomerTab, setActiveCustomerTab } = useStore();
   const [showLocationModal, setShowLocationModal] = useState(false);
 
-  // Sanitize WhatsApp number for reliable link
-  const cleanWhatsAppNumber = store.whatsapp.replace(/[^0-9]/g, '');
-  const hasValidWhatsApp = cleanWhatsAppNumber.length >= 9;
+  const hasValidWhatsApp = Boolean(store.whatsapp || store.phone);
 
   const handleWhatsAppContact = () => {
-    if (!hasValidWhatsApp) {
+    const text = `Hi ${store.name}! 👋 I am browsing your bio storefront on TapShop and I would like to inquire about your products & pickup/delivery options.`;
+    const waLink = buildWhatsAppLink(store.whatsapp || store.phone, text);
+    if (!waLink) {
       alert('The seller has not configured a valid WhatsApp number yet.');
       return;
     }
-    const text = encodeURIComponent(
-      `Hi ${store.name}! 👋 I am browsing your bio storefront on TapShop and I would like to inquire about your products & pickup/delivery options.`
-    );
-    window.open(`https://wa.me/${cleanWhatsAppNumber}?text=${text}`, '_blank', 'noopener,noreferrer');
+    window.open(waLink, '_blank', 'noopener,noreferrer');
   };
 
   const handlePhoneCall = () => {
@@ -216,8 +214,16 @@ export const StoreHeader: React.FC = () => {
 
       {/* Business Details & Pickup Station Modal */}
       {showLocationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 p-5 sm:p-6 max-h-[85vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLocationModal(false);
+          }}
+        >
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 p-5 sm:p-6 max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Store className="w-5 h-5 text-emerald-600" />

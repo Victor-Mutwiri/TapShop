@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Order } from '../../types';
+import { extractKenyaMobileDigits } from '../../utils/phoneUtils';
 import {
   Search,
   Package,
@@ -25,10 +26,12 @@ export const OrderTrackerView: React.FC = () => {
     if (!query.trim()) return;
 
     const clean = query.trim().toUpperCase();
+    const digits = extractKenyaMobileDigits(query);
     const found = orders.find(
       (o) =>
         o.id.toUpperCase() === clean ||
         o.id.replace('#', '').toUpperCase() === clean ||
+        (digits && o.customer.phone.includes(digits)) ||
         o.customer.phone.includes(query.trim()) ||
         o.paymentProof.transactionCode.toUpperCase() === clean
     );

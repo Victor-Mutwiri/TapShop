@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Order, Store as StoreType } from '../../types';
 import { jsPDF } from 'jspdf';
+import { buildWhatsAppLink } from '../../utils/phoneUtils';
 import {
   X,
   Printer,
@@ -255,27 +256,27 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
       doc.save(`Receipt-${order.id}.pdf`);
 
       // 2. Open WhatsApp to customer with prefilled notification
-      const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
-      if (!cleanPhone) {
-        alert('Buyer WhatsApp number is not available.');
-        return;
-      }
-
-      const text = encodeURIComponent(
+      const buyerPhone = order.customer.whatsapp || order.customer.phone;
+      const text =
         `Hello ${order.customer.fullName}! 👋\n\n` +
         `This is ${store.name}. Your payment for Order #${order.id} has been verified! ✅\n\n` +
         `📄 We have generated your official Sales Receipt (Receipt #REC-${order.id.replace('#', '')}).\n` +
         `💰 Total Paid: KES ${order.totalAmount.toLocaleString()}\n` +
         `📱 M-Pesa Code: ${order.paymentProof.transactionCode}\n\n` +
-        `Attached is your official PDF receipt. Asante sana for shopping with us!`
-      );
+        `Attached is your official PDF receipt. Asante sana for shopping with us!`;
+
+      const waLink = buildWhatsAppLink(buyerPhone, text);
+      if (!waLink) {
+        alert('Buyer WhatsApp number is not available.');
+        return;
+      }
 
       setStatusMessage(
         `Receipt-${order.id}.pdf has been downloaded! You can now attach this PDF in the opened WhatsApp chat.`
       );
 
       setTimeout(() => {
-        window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank', 'noopener,noreferrer');
+        window.open(waLink, '_blank', 'noopener,noreferrer');
       }, 500);
     } catch (err) {
       console.error(err);
@@ -322,8 +323,16 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 flex flex-col max-h-[92vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Top Control Bar (Hidden on print) */}
         <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
           <div className="flex items-center gap-2">

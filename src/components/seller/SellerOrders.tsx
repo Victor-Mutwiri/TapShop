@@ -3,6 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { Order, OrderStatus } from '../../types';
 import { PWAInstallBanner } from '../common/PWAInstallBanner';
 import { OrderReceiptModal } from '../common/OrderReceiptModal';
+import { buildWhatsAppLink } from '../../utils/phoneUtils';
 import {
   Package,
   Clock,
@@ -66,40 +67,38 @@ export const SellerOrders: React.FC = () => {
   };
 
   const handleCustomerWhatsApp = (order: Order) => {
-    const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
-    if (!cleanPhone) {
-      alert('Buyer did not provide a phone number for WhatsApp.');
-      return;
-    }
-
     const isPickup = order.customer.fulfillmentType === 'pickup';
-    const message = encodeURIComponent(
+    const message =
       `Hi ${order.customer.fullName}! 👋 Thank you for ordering from ${store.name} (Order #${order.id}).\n\n` +
       (isPickup
         ? `Your order will be available for pickup at ${order.customer.pickupStationName}.\n📋 To collect your parcel, simply present Order ID #${order.id} to the shop counter clerk.`
-        : `Your order is confirmed for delivery to ${order.customer.deliveryAddress}, ${order.customer.city}. We are packing your item for dispatch!`)
-    );
+        : `Your order is confirmed for delivery to ${order.customer.deliveryAddress}, ${order.customer.city}. We are packing your item for dispatch!`);
 
-    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleDeclineWhatsApp = (order: Order, reason?: string) => {
-    const cleanPhone = (order.customer.whatsapp || order.customer.phone).replace(/[^0-9]/g, '');
-    if (!cleanPhone) {
-      alert('Buyer did not provide a phone number for WhatsApp.');
+    const waLink = buildWhatsAppLink(order.customer.whatsapp || order.customer.phone, message);
+    if (!waLink) {
+      alert('Buyer did not provide a valid phone number for WhatsApp.');
       return;
     }
 
+    window.open(waLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDeclineWhatsApp = (order: Order, reason?: string) => {
     const r = reason || order.declineReason || 'Payment could not be verified in our M-Pesa account';
-    const message = encodeURIComponent(
+    const message =
       `Hello ${order.customer.fullName}! 👋\n\n` +
       `This is ${store.name} regarding your order #${order.id}.\n\n` +
       `Unfortunately, we are unable to process this order due to the following reason:\n` +
       `❌ ${r}\n\n` +
-      `If you have already sent payment or have questions, please reply directly with your M-Pesa SMS confirmation and we will be happy to assist you!`
-    );
+      `If you have already sent payment or have questions, please reply directly with your M-Pesa SMS confirmation and we will be happy to assist you!`;
 
-    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
+    const waLink = buildWhatsAppLink(order.customer.whatsapp || order.customer.phone, message);
+    if (!waLink) {
+      alert('Buyer did not provide a valid phone number for WhatsApp.');
+      return;
+    }
+
+    window.open(waLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleConfirm = (orderId: string) => {
@@ -904,8 +903,16 @@ export const SellerOrders: React.FC = () => {
 
       {/* COMPACT & ELEGANT DECLINE ORDER MODAL */}
       {declineTargetOrder && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 p-5 sm:p-6 space-y-4">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeclineTargetOrder(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 p-5 sm:p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">

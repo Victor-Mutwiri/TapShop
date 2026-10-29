@@ -3,6 +3,12 @@ import { useStore } from '../../context/StoreContext';
 import { CustomerDetails, PaymentProof, FulfillmentType, DeliveryZoneType } from '../../types';
 import { parseMpesaMessage, getSampleMpesaMessage } from '../../utils/mpesaParser';
 import {
+  extractKenyaMobileDigits,
+  isValidKenyaMobile,
+  formatKenyaNationalDisplay,
+  toE164KenyaPhone,
+} from '../../utils/phoneUtils';
+import {
   X,
   Copy,
   Check,
@@ -40,11 +46,13 @@ export const CheckoutModal: React.FC = () => {
   );
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZoneType>('nairobi');
 
-  // Customer contact fields
+  // Customer contact fields with mandatory +254 Kenya country code
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [phoneDisplay, setPhoneDisplay] = useState('');
   const [isPhoneOnWhatsApp, setIsPhoneOnWhatsApp] = useState(true);
-  const [whatsapp, setWhatsapp] = useState('');
+  const [whatsappDigits, setWhatsappDigits] = useState('');
+  const [whatsappDisplay, setWhatsappDisplay] = useState('');
   const [email, setEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [city, setCity] = useState('Nairobi');
@@ -65,6 +73,32 @@ export const CheckoutModal: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handlePhoneChange = (val: string) => {
+    const digits = extractKenyaMobileDigits(val);
+    setPhoneDigits(digits);
+    setPhoneDisplay(formatKenyaNationalDisplay(digits));
+    if (errors.phone) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.phone;
+        return next;
+      });
+    }
+  };
+
+  const handleWhatsappChange = (val: string) => {
+    const digits = extractKenyaMobileDigits(val);
+    setWhatsappDigits(digits);
+    setWhatsappDisplay(formatKenyaNationalDisplay(digits));
+    if (errors.whatsapp) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.whatsapp;
+        return next;
+      });
+    }
   };
 
   if (!isCheckoutOpen) return null;
@@ -111,21 +145,27 @@ export const CheckoutModal: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!phone.trim()) {
-      newErrors.phone = 'Phone number is required for verification and notification';
-    } else if (phone.trim().length < 9) {
-      newErrors.phone = 'Please enter a valid phone number';
+    if (!fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    } else if (fullName.trim().length < 2) {
+      newErrors.fullName = 'Please enter your full name';
     }
+
+    if (!phoneDigits) {
+      newErrors.phone = 'Phone number is required for verification and communication';
+    } else if (!isValidKenyaMobile(phoneDigits)) {
+      newErrors.phone = 'Please enter a valid 9-digit Kenya mobile number (e.g. 712 345 678)';
+    }
+
     if (!email.trim() || !email.includes('@')) {
       newErrors.email = 'Valid email address is required';
     }
 
     if (!isPhoneOnWhatsApp) {
-      if (!whatsapp.trim()) {
+      if (!whatsappDigits) {
         newErrors.whatsapp = 'Please enter your WhatsApp number to receive your order receipt';
-      } else if (whatsapp.trim().length < 9) {
-        newErrors.whatsapp = 'Please enter a valid WhatsApp number';
+      } else if (!isValidKenyaMobile(whatsappDigits)) {
+        newErrors.whatsapp = 'Please enter a valid 9-digit Kenya WhatsApp number';
       }
     }
 
@@ -139,11 +179,11 @@ export const CheckoutModal: React.FC = () => {
       if (!rawSms.trim()) {
         newErrors.proof = 'Please paste your M-Pesa confirmation SMS or use the sample button.';
       } else if (!parsedSms.isValid && !resolvedCode) {
-        newErrors.proof = 'Could not find a valid M-Pesa transaction code in the message.';
+        newErrors.proof = parsedSms.validationError || 'Could not find a valid 10-character M-Pesa transaction code in the message.';
       }
     } else if (proofMode === 'code') {
-      if (!directCode.trim() || directCode.trim().length < 8) {
-        newErrors.proof = 'Please enter a valid 8-12 character M-Pesa transaction code.';
+      if (!directCode.trim() || directCode.trim().length !== 10) {
+        newErrors.proof = 'Please enter a valid 10-character M-Pesa reference code (e.g. QA72KL491X).';
       }
     } else if (proofMode === 'screenshot') {
       if (!receiptImage) {
@@ -168,12 +208,17 @@ export const CheckoutModal: React.FC = () => {
 
     const selectedStation = store.pickupStations.find((s) => s.id === selectedStationId);
 
+    const finalPhone = toE164KenyaPhone(phoneDigits);
+    const finalWhatsapp = isPhoneOnWhatsApp
+      ? finalPhone
+      : toE164KenyaPhone(whatsappDigits || phoneDigits);
+
     const customer: CustomerDetails = {
       fullName: fullName.trim(),
-      phone: phone.trim(),
+      phone: finalPhone,
       isPhoneOnWhatsApp,
       email: email.trim(),
-      whatsapp: isPhoneOnWhatsApp ? phone.trim() : (whatsapp.trim() || phone.trim()),
+      whatsapp: finalWhatsapp,
       fulfillmentType,
       pickupStationId: fulfillmentType === 'pickup' ? selectedStationId : undefined,
       pickupStationName: fulfillmentType === 'pickup' && selectedStation ? `${selectedStation.name} (${selectedStation.building})` : undefined,
@@ -187,7 +232,7 @@ export const CheckoutModal: React.FC = () => {
       method: 'mpesa',
       transactionCode: resolvedCode,
       rawMessage: rawSms.trim() || undefined,
-      senderPhone: phone.trim(),
+      senderPhone: finalPhone,
       amountReported: totalAmount,
       receiptImageUrl: receiptImage || undefined,
       submittedAt: new Date().toISOString(),
@@ -200,8 +245,16 @@ export const CheckoutModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 my-4 sm:my-8 flex flex-col max-h-[94vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setIsCheckoutOpen(false);
+      }}
+    >
+      <div
+        className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 my-4 sm:my-8 flex flex-col max-h-[94vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-3.5 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
           <div>
@@ -442,17 +495,28 @@ export const CheckoutModal: React.FC = () => {
                 <label className="block font-medium text-slate-700 mb-1">
                   Phone Number (M-Pesa &amp; Contact) <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="tel"
-                  placeholder="e.g. 0712 345 678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 ${
+                <div
+                  className={`flex rounded-xl overflow-hidden border bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500 ${
                     errors.phone ? 'border-rose-400' : 'border-slate-200'
                   }`}
-                />
+                >
+                  <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 font-mono text-xs font-bold border-r border-slate-200 select-none shrink-0">
+                    <span className="text-sm">🇰🇪</span>
+                    <span>+254</span>
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={11}
+                    placeholder="712 345 678"
+                    value={phoneDisplay}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-transparent text-xs font-mono font-medium focus:outline-none"
+                  />
+                </div>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Used for M-Pesa verification and order/delivery communication.
+                  Enter 9 digits. Used for M-Pesa verification and order/delivery communication.
                 </p>
                 {errors.phone && <p className="text-[10px] text-rose-500 mt-0.5">{errors.phone}</p>}
 
@@ -495,15 +559,26 @@ export const CheckoutModal: React.FC = () => {
                   <label className="block font-medium text-slate-800">
                     WhatsApp Number (For Order Confirmation &amp; Receipts) <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="tel"
-                    placeholder="e.g. 0722 000 111"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    className={`w-full px-3 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-emerald-500 ${
+                  <div
+                    className={`flex rounded-xl overflow-hidden border bg-white focus-within:ring-2 focus-within:ring-emerald-500 ${
                       errors.whatsapp ? 'border-rose-400' : 'border-slate-200'
                     }`}
-                  />
+                  >
+                    <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 font-mono text-xs font-bold border-r border-slate-200 select-none shrink-0">
+                      <span className="text-sm">🇰🇪</span>
+                      <span>+254</span>
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={11}
+                      placeholder="722 000 111"
+                      value={whatsappDisplay}
+                      onChange={(e) => handleWhatsappChange(e.target.value)}
+                      className="w-full px-3 py-2 bg-transparent text-xs font-mono font-medium focus:outline-none"
+                    />
+                  </div>
                   <p className="text-[10px] text-slate-500">
                     The seller will send your digital receipt, tracking status, and order updates to this WhatsApp.
                   </p>
@@ -814,7 +889,7 @@ export const CheckoutModal: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Paste SMS
+                  From SMS
                 </button>
                 <button
                   type="button"
@@ -825,7 +900,7 @@ export const CheckoutModal: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Code Only
+                  Enter Code
                 </button>
                 <button
                   type="button"
@@ -841,12 +916,12 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Mode 1: Paste SMS Text */}
+            {/* Mode 1: From SMS Text */}
             {proofMode === 'sms' && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">
-                    Paste the Safaricom M-Pesa SMS confirmation:
+                    Paste your Safaricom M-Pesa confirmation SMS:
                   </span>
                   <button
                     type="button"
@@ -854,20 +929,21 @@ export const CheckoutModal: React.FC = () => {
                     className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors"
                   >
                     <Sparkles className="w-3 h-3" />
-                    <span>Paste Sample SMS</span>
+                    <span>Fill Sample SMS</span>
                   </button>
                 </div>
 
                 <textarea
                   rows={2}
-                  placeholder="e.g. RK92JN182P Confirmed. Ksh2,800.00 paid to SOLARIUM VAULT..."
+                  placeholder="e.g. QA72KL491X Confirmed. Ksh2,800.00 paid to SOLARIUM VAULT on 24/10/26 at 3:15 PM..."
                   value={rawSms}
                   onChange={(e) => setRawSms(e.target.value)}
                   className="w-full p-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500"
                 />
 
+                {/* Valid Code Detected */}
                 {parsedSms.isValid && (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs animate-in fade-in">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span className="font-semibold text-emerald-900">
@@ -875,9 +951,22 @@ export const CheckoutModal: React.FC = () => {
                         {parsedSms.amount && ` · KES ${parsedSms.amount.toLocaleString()}`}
                       </span>
                     </div>
-                    <span className="text-[10px] font-medium text-emerald-700 uppercase bg-emerald-100 px-1.5 py-0.5 rounded">
-                      Parsed
+                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Auto-filled
                     </span>
+                  </div>
+                )}
+
+                {/* Text Entered but No Valid Code Detected (e.g. Chat text or fake message) */}
+                {rawSms.trim().length > 0 && !parsedSms.isValid && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-xs text-amber-900 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <div className="font-semibold">No M-Pesa transaction reference detected</div>
+                      <div className="text-[11px] text-amber-800">
+                        Please paste the official Safaricom confirmation SMS (e.g. starting with a 10-character code like QA72KL491X) or switch to <strong>Enter Code</strong> above.
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

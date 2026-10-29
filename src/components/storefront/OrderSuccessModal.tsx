@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { buildWhatsAppLink } from '../../utils/phoneUtils';
 import {
   CheckCircle2,
   Clock,
@@ -11,6 +12,7 @@ import {
   Copy,
   Check,
   Lock,
+  X,
 } from 'lucide-react';
 
 export const OrderSuccessModal: React.FC = () => {
@@ -28,26 +30,25 @@ export const OrderSuccessModal: React.FC = () => {
   const isPickup = activePlacedOrder.customer.fulfillmentType === 'pickup';
 
   const handleShareToWhatsApp = () => {
-    const cleanNumber = store.whatsapp.replace(/[^0-9]/g, '');
-    if (!cleanNumber) {
-      alert('Seller WhatsApp number not available.');
-      return;
-    }
-
     const fulfillmentText = isPickup
       ? `📍 Pickup Station: ${activePlacedOrder.customer.pickupStationName}\n📋 Order ID for Collection: #${activePlacedOrder.id}`
       : `🚚 Doorstep Delivery To: ${activePlacedOrder.customer.fullName}, ${activePlacedOrder.customer.deliveryAddress}, ${activePlacedOrder.customer.city}`;
 
-    const message = encodeURIComponent(
+    const message =
       `Hi ${store.name}! 👋 I just placed order #${activePlacedOrder.id} through your TapShop bio portal.\n\n` +
       `📦 Items: ${activePlacedOrder.items.map((i) => `${i.quantity}x ${i.title}`).join(', ')}\n` +
       `💰 Total: KES ${activePlacedOrder.totalAmount.toLocaleString()}\n` +
       `📱 M-Pesa Code: ${activePlacedOrder.paymentProof.transactionCode}\n` +
       `${fulfillmentText}\n\n` +
-      `Please confirm payment and processing. Thank you!`
-    );
+      `Please confirm payment and processing. Thank you!`;
 
-    window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank', 'noopener,noreferrer');
+    const waLink = buildWhatsAppLink(store.whatsapp || store.phone, message);
+    if (!waLink) {
+      alert('Seller WhatsApp number not available.');
+      return;
+    }
+
+    window.open(waLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleCopyOrderId = () => {
@@ -62,8 +63,24 @@ export const OrderSuccessModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 p-5 sm:p-7 text-center my-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setActivePlacedOrder(null);
+      }}
+    >
+      <div
+        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 p-5 sm:p-7 text-center my-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top-right close button */}
+        <button
+          onClick={() => setActivePlacedOrder(null)}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
         {/* Animated Success Badge */}
         <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3 text-emerald-600 shadow-inner">
           <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />

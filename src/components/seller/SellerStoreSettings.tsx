@@ -21,6 +21,12 @@ import {
   Tag,
   Briefcase,
 } from 'lucide-react';
+import {
+  extractKenyaMobileDigits,
+  isValidKenyaMobile,
+  formatKenyaNationalDisplay,
+  toE164KenyaPhone,
+} from '../../utils/phoneUtils';
 import { MpesaPaymentType } from '../../types';
 
 export const SellerStoreSettings: React.FC = () => {
@@ -31,11 +37,25 @@ export const SellerStoreSettings: React.FC = () => {
   const [handle, setHandle] = useState(store.handle);
   const [slogan, setSlogan] = useState(store.slogan);
   const [description, setDescription] = useState(store.description);
-  const [phone, setPhone] = useState(store.phone);
-  const [whatsapp, setWhatsapp] = useState(store.whatsapp);
+  const [phoneDigits, setPhoneDigits] = useState(extractKenyaMobileDigits(store.phone));
+  const [phoneDisplay, setPhoneDisplay] = useState(formatKenyaNationalDisplay(extractKenyaMobileDigits(store.phone)));
+  const [whatsappDigits, setWhatsappDigits] = useState(extractKenyaMobileDigits(store.whatsapp));
+  const [whatsappDisplay, setWhatsappDisplay] = useState(formatKenyaNationalDisplay(extractKenyaMobileDigits(store.whatsapp)));
   const [physicalLocation, setPhysicalLocation] = useState(store.physicalLocation || '');
   const [operatingHours, setOperatingHours] = useState(store.operatingHours || '');
   const [instagram, setInstagram] = useState(store.instagram);
+
+  const handlePhoneChange = (val: string) => {
+    const digits = extractKenyaMobileDigits(val);
+    setPhoneDigits(digits);
+    setPhoneDisplay(formatKenyaNationalDisplay(digits));
+  };
+
+  const handleWhatsappChange = (val: string) => {
+    const digits = extractKenyaMobileDigits(val);
+    setWhatsappDigits(digits);
+    setWhatsappDisplay(formatKenyaNationalDisplay(digits));
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,14 +130,23 @@ export const SellerStoreSettings: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isValidKenyaMobile(phoneDigits)) {
+      alert('Please enter a valid 9-digit Kenya business phone number (e.g. 712 345 678).');
+      return;
+    }
+    if (!isValidKenyaMobile(whatsappDigits)) {
+      alert('Please enter a valid 9-digit Kenya WhatsApp number.');
+      return;
+    }
+
     updateStore({
       logo: logo.trim(),
       name: name.trim(),
       handle: handle.trim().toLowerCase().replace(/[^a-z0-9-_]/g, ''),
       slogan: slogan.trim(),
       description: description.trim(),
-      phone: phone.trim(),
-      whatsapp: whatsapp.trim().replace(/[^0-9]/g, ''),
+      phone: toE164KenyaPhone(phoneDigits),
+      whatsapp: `254${whatsappDigits}`,
       physicalLocation: physicalLocation.trim(),
       operatingHours: operatingHours.trim(),
       instagram: instagram.trim(),
@@ -287,28 +316,52 @@ export const SellerStoreSettings: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">
                 Business Phone Number (Mandatory) <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                required
-                placeholder="+254 712 345 678"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 font-mono font-medium"
-              />
+              <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 font-mono text-xs font-bold border-r border-slate-200 select-none shrink-0">
+                  <span className="text-sm">🇰🇪</span>
+                  <span>+254</span>
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={11}
+                  required
+                  placeholder="712 345 678"
+                  value={phoneDisplay}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-transparent text-xs font-mono font-medium focus:outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Enter 9 digits. Customers see this number for customer support.
+              </p>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
                 WhatsApp DM Number (Mandatory) <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                required
-                placeholder="254712345678"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 font-mono font-medium"
-              />
+              <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 font-mono text-xs font-bold border-r border-slate-200 select-none shrink-0">
+                  <span className="text-sm">🇰🇪</span>
+                  <span>+254</span>
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={11}
+                  required
+                  placeholder="712 345 678"
+                  value={whatsappDisplay}
+                  onChange={(e) => handleWhatsappChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-transparent text-xs font-mono font-medium focus:outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Enter 9 digits. Used for instant order alerts, WhatsApp receipts, and buyer inquiries.
+              </p>
             </div>
 
             <div className="sm:col-span-2">

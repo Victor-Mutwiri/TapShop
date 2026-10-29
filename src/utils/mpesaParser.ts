@@ -4,15 +4,38 @@ export interface ParsedMpesaMessage {
   recipientOrOrg: string | null;
   dateTime: string | null;
   raw: string;
+  hasContent: boolean;
   isValid: boolean;
+  validationError?: string;
 }
 
 /**
- * Parses Kenyan M-Pesa SMS confirmation text.
- * Common formats:
- * 1. "QA72KL491X Confirmed. Ksh2,400.00 paid to SOLARIUM SUNGLASSES on 24/10/26 at 3:15 PM. New M-PESA balance is..."
- * 2. "RK84NN921M Confirmed. Ksh 3,200.00 sent to 0712345678 JOHN DOE on 24/10/26 at 1:45 PM."
- * 3. "SL19PL440K Confirmed. On 24/10/26 at 5:02 PM Ksh1,800.00 paid to Till 849201."
+ * Words that might accidentally match a 10-letter regex but are NOT M-Pesa codes
+ */
+const COMMON_NON_CODES = new Set([
+  'CONFIRMED',
+  'TRANSACT',
+  'TRANSACTION',
+  'COMPLETED',
+  'STATEMENT',
+  'CUSTOMERS',
+  'EVERYTHING',
+  'NOTIFICATION',
+  'YESTERDAY',
+  'SOLARIUMS',
+  'BALANCES',
+  'TRANSFERS',
+]);
+
+/**
+ * Extracts and verifies Kenyan M-Pesa SMS confirmation text.
+ * Safaricom transaction reference rules:
+ * - 10 characters long, alphanumeric (e.g., QA72KL491X, SL19PL440K, RK84NN921M).
+ * - Must contain letters and digits (never all letters, never all digits).
+ * - Usually at the very beginning of the SMS followed by "Confirmed." or "Ref:".
+ *
+ * If the user pastes a standard WhatsApp message or invalid text, it safely flags it
+ * without extracting bogus words.
  */
 export function parseMpesaMessage(rawText: string): ParsedMpesaMessage {
   const clean = rawText.trim();
@@ -23,13 +46,36 @@ export function parseMpesaMessage(rawText: string): ParsedMpesaMessage {
       recipientOrOrg: null,
       dateTime: null,
       raw: '',
+      hasContent: false,
       isValid: false,
     };
   }
 
-  // 1. Transaction Code (Usually 10 uppercase alphanumeric chars starting at the beginning or before 'Confirmed')
-  const codeMatch = clean.match(/^([A-Z0-9]{8,12})\b/i) || clean.match(/\b([A-Z0-9]{10})\b/);
-  const transactionCode = codeMatch ? codeMatch[1].toUpperCase() : null;
+  // 1. Transaction Code Detection
+  // Genuine Safaricom M-Pesa codes start with 2 uppercase letters followed by 8 alphanumeric chars (e.g. QA72KL491X)
+  // Or match 10-char alphanumeric tokens with at least 1 digit and 1 letter.
+  let transactionCode: string | null = null;
+
+  // Pattern A: Classic start of Safaricom SMS: "QA72KL491X Confirmed." or "RK84NN921M Confirmed"
+  const startMatch = clean.match(/^([A-Z0-9]{10})\s+Confirmed\b/i);
+  if (startMatch) {
+    const candidate = startMatch[1].toUpperCase();
+    if (isValidCodeStructure(candidate)) {
+      transactionCode = candidate;
+    }
+  }
+
+  // Pattern B: Look for 10-char alphanumeric word anywhere with both letters & numbers
+  if (!transactionCode) {
+    const words = clean.split(/[\s,.;:()]+/);
+    for (const w of words) {
+      const candidate = w.trim().toUpperCase();
+      if (candidate.length === 10 && isValidCodeStructure(candidate)) {
+        transactionCode = candidate;
+        break;
+      }
+    }
+  }
 
   // 2. Amount regex: "Ksh" or "KSh" followed by numbers with optional commas and decimals
   const amountMatch = clean.match(/(?:Ksh\.?|KSh\.?)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?)/i);
@@ -48,7 +94,14 @@ export function parseMpesaMessage(rawText: string): ParsedMpesaMessage {
   const dateMatch = clean.match(/on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})\s+at\s+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
   const dateTime = dateMatch ? `${dateMatch[1]} at ${dateMatch[2]}` : null;
 
-  const isValid = Boolean(transactionCode && transactionCode.length >= 8);
+  // Validation verdict
+  const isValid = Boolean(transactionCode && isValidCodeStructure(transactionCode));
+
+  let validationError: string | undefined = undefined;
+  if (!isValid) {
+    validationError =
+      'No valid 10-character M-Pesa transaction reference found in this text. Please paste the official Safaricom confirmation SMS (e.g. QA72KL491X) or enter the code manually.';
+  }
 
   return {
     transactionCode,
@@ -56,8 +109,31 @@ export function parseMpesaMessage(rawText: string): ParsedMpesaMessage {
     recipientOrOrg,
     dateTime,
     raw: clean,
+    hasContent: true,
     isValid,
+    validationError,
   };
+}
+
+/**
+ * Validates if candidate token follows authentic Safaricom reference structure
+ */
+function isValidCodeStructure(code: string): boolean {
+  if (code.length !== 10) return false;
+  if (COMMON_NON_CODES.has(code)) return false;
+
+  // Must only contain uppercase A-Z and 0-9
+  if (!/^[A-Z0-9]{10}$/.test(code)) return false;
+
+  // Safaricom codes ALWAYS contain at least one digit AND at least one letter
+  const hasLetter = /[A-Z]/.test(code);
+  const hasDigit = /[0-9]/.test(code);
+  if (!hasLetter || !hasDigit) return false;
+
+  // Must start with a letter (Safaricom references start with alpha characters like QA, RK, SL, etc.)
+  if (!/^[A-Z]/.test(code)) return false;
+
+  return true;
 }
 
 /**
